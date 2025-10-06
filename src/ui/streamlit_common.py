@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 
-def get_pipeline(provider: Optional[str] = None) -> Optional[LegalEventsPipeline]:
+def get_pipeline(provider: Optional[str] = None, runtime_model: Optional[str] = None, doc_extractor: Optional[str] = None) -> Optional[LegalEventsPipeline]:
     """
     Get or create pipeline instance with session state caching
     Ensures environment validation runs once and same instance is reused
@@ -25,18 +25,25 @@ def get_pipeline(provider: Optional[str] = None) -> Optional[LegalEventsPipeline
     Args:
         provider: Event extractor provider ('langextract', 'openrouter', 'opencode_zen', 'openai', 'anthropic')
                   If None, uses environment default (EVENT_EXTRACTOR env var)
+        runtime_model: Runtime model override (for OpenRouter multi-model selection)
+                       If None, uses environment default (OPENROUTER_MODEL env var)
+        doc_extractor: Document extractor provider ('docling', 'gemini')
+                       If None, uses environment default (DOC_EXTRACTOR env var)
 
     Returns:
         LegalEventsPipeline instance configured for the specified provider, or None if initialization fails
     """
     from ..core.extractor_factory import ExtractorConfigurationError
 
-    # Track current provider for cache invalidation
+    # Track current provider + model + doc extractor combination for cache invalidation
     current_provider = provider if provider else 'default'
+    current_doc = doc_extractor if doc_extractor else 'default'
+    current_key = f"{current_doc}:{current_provider}:{runtime_model or 'default'}"
 
-    # Invalidate cache if provider changed
-    if 'pipeline_provider' in st.session_state and st.session_state['pipeline_provider'] != current_provider:
-        logger.info(f"🔄 Provider changed from {st.session_state['pipeline_provider']} to {current_provider} - clearing cache")
+    # Invalidate cache if provider or model changed
+    if 'pipeline_key' in st.session_state and st.session_state['pipeline_key'] != current_key:
+        old_key = st.session_state['pipeline_key']
+        logger.info(f"🔄 Pipeline config changed from {old_key} to {current_key} - clearing cache")
         if 'pipeline' in st.session_state:
             del st.session_state['pipeline']
         # Clear any previous provider errors
@@ -46,15 +53,20 @@ def get_pipeline(provider: Optional[str] = None) -> Optional[LegalEventsPipeline
     # Create new pipeline if not cached
     if 'pipeline' not in st.session_state:
         try:
-            st.session_state['pipeline'] = LegalEventsPipeline(event_extractor=provider)
-            st.session_state['pipeline_provider'] = current_provider
+            st.session_state['pipeline'] = LegalEventsPipeline(
+                event_extractor=provider,
+                runtime_model=runtime_model,
+                doc_extractor=doc_extractor
+            )
+            st.session_state['pipeline_key'] = current_key
 
             # Clear any previous errors on successful initialization
             if 'provider_error' in st.session_state:
                 del st.session_state['provider_error']
 
             provider_display = provider if provider else "environment default"
-            logger.info(f"✅ Pipeline initialized with provider: {provider_display}")
+            doc_display = doc_extractor if doc_extractor else "environment default"
+            logger.info(f"✅ Pipeline initialized with doc extractor: {doc_display}, event provider: {provider_display}")
 
         except ValueError as e:
             # Handle pipeline-level validation errors (provider-specific credential checks)
@@ -237,7 +249,7 @@ def save_results_to_project(
         logger.warning(f"⚠️ Auto-save failed: {e}")
 
 
-def process_documents_with_spinner(uploaded_files, show_subheader: bool = True, provider: Optional[str] = None) -> Optional[pd.DataFrame]:
+def process_documents_with_spinner(uploaded_files, show_subheader: bool = True, provider: Optional[str] = None, runtime_model: Optional[str] = None, doc_extractor: Optional[str] = None) -> Optional[pd.DataFrame]:
     """
     Shared processing helper with spinner and status handling
     Reusable across all Streamlit entry points to avoid duplication
@@ -246,6 +258,8 @@ def process_documents_with_spinner(uploaded_files, show_subheader: bool = True, 
         uploaded_files: List of uploaded file objects
         show_subheader: Whether to show processing subheader
         provider: Event extractor provider override (optional)
+        runtime_model: Runtime model override for OpenRouter multi-model selection (optional)
+        doc_extractor: Document extractor provider override (optional)
 
     Returns:
         DataFrame with legal events or None if failed
@@ -256,14 +270,16 @@ def process_documents_with_spinner(uploaded_files, show_subheader: bool = True, 
     if show_subheader:
         st.subheader("🔄 Legal Events Processing")
 
-    # Determine provider display name for spinner
+    # Determine provider display names for spinner
+    doc_extractor_name = doc_extractor.title() if doc_extractor else "Docling"
     provider_name = provider if provider else "default provider"
-    spinner_text = f"Processing through pipeline: Docling → {provider_name.title()} → Five-Column Table..."
+    model_suffix = f" ({runtime_model})" if runtime_model else ""
+    spinner_text = f"Processing through pipeline: {doc_extractor_name} → {provider_name.title()}{model_suffix} → Five-Column Table..."
 
     with st.spinner(spinner_text):
         try:
-            # Get cached pipeline instance with provider override
-            pipeline = get_pipeline(provider=provider)
+            # Get cached pipeline instance with provider and model override
+            pipeline = get_pipeline(provider=provider, runtime_model=runtime_model, doc_extractor=doc_extractor)
 
             # Check if pipeline initialization failed
             if pipeline is None:

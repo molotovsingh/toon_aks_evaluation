@@ -69,7 +69,7 @@ The Streamlit application (`app.py`) includes a **provider selector** in the Pro
 - **OpenAI** (GPT-4o/4-mini) - **Quality Champion** - Most detailed extraction
 - **LangExtract** (Google Gemini) - **Completeness Champion** - Captures all details
 - **DeepSeek** (Direct API) - **Research Champion** - Advanced reasoning model
-- **OpenCode Zen** (Legal AI) - ⚠️ Currently unstable
+- **OpenCode Zen** (Model Router)
 
 **📊 Provider Comparison** (based on 2025-10-03 testing):
 
@@ -114,7 +114,7 @@ See detailed evaluations:
 - **OpenAI**: `OPENAI_API_KEY` (for maximum quality)
 - **LangExtract**: `GEMINI_API_KEY` or `GOOGLE_API_KEY` (either one)
 - **DeepSeek**: `DEEPSEEK_API_KEY` (for advanced reasoning)
-- **OpenCode Zen**: `OPENCODEZEN_API_KEY` (for legal AI specialization)
+- **OpenCode Zen**: `OPENCODEZEN_API_KEY` (alternative model router)
 
 **How Validation Works:**
 - Selecting LangExtract → Validates `GEMINI_API_KEY` only

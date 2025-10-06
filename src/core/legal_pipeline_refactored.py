@@ -48,19 +48,28 @@ class LegalEventsPipeline:
         }
     }
 
-    def __init__(self, event_extractor: Optional[str] = None):
+    def __init__(self, event_extractor: Optional[str] = None, runtime_model: Optional[str] = None, doc_extractor: Optional[str] = None):
         # Track requested event extractor (default to env)
         requested_provider = event_extractor or os.getenv("EVENT_EXTRACTOR") or "langextract"
         self.event_extractor_type = requested_provider.strip().lower()
 
-        # Store provider for metadata tracking
+        # Track requested document extractor (default to env)
+        requested_doc_extractor = doc_extractor or os.getenv("DOC_EXTRACTOR") or "docling"
+        self.doc_extractor_type = requested_doc_extractor.strip().lower()
+
+        # Store provider and runtime model for metadata tracking
         self.provider = self.event_extractor_type
+        self.runtime_model = runtime_model
 
         # Validate environment with provider-aware checks
         self._validate_environment()
 
-        # Initialize pluggable extractors
-        self.document_extractor, self.event_extractor = create_default_extractors(self.event_extractor_type)
+        # Initialize pluggable extractors with runtime model override
+        self.document_extractor, self.event_extractor = create_default_extractors(
+            self.event_extractor_type,
+            runtime_model=runtime_model,
+            doc_extractor_override=self.doc_extractor_type
+        )
         self.file_handler = FileHandler()
 
         # Validate extractors are properly configured
@@ -68,7 +77,8 @@ class LegalEventsPipeline:
             logger.warning("⚠️ Extractor validation failed - pipeline may have limited functionality")
 
         logger.info(
-            "✅ Modular legal events pipeline initialized with pluggable adapters (%s)",
+            "✅ Modular legal events pipeline initialized with pluggable adapters (doc:%s, event:%s)",
+            self.document_extractor.__class__.__name__,
             self.event_extractor.__class__.__name__
         )
 

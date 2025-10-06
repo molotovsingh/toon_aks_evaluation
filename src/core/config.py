@@ -89,13 +89,25 @@ class LangExtractConfig:
 
 @dataclass
 class OpenRouterConfig:
-    """Configuration for OpenRouter API operations"""
+    """Configuration for OpenRouter API operations
+
+    Supports runtime model override for per-request model selection.
+    The active_model property returns runtime_model if set, otherwise falls back to env default.
+    """
 
     # API settings
     api_key: str = field(default_factory=lambda: env_str("OPENROUTER_API_KEY", ""))
     base_url: str = field(default_factory=lambda: env_str("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"))
-    model: str = field(default_factory=lambda: env_str("OPENROUTER_MODEL", "anthropic/claude-3-haiku"))
+    model: str = field(default_factory=lambda: env_str("OPENROUTER_MODEL", "openai/gpt-4o-mini"))  # Updated default
     timeout: int = field(default_factory=lambda: env_int("OPENROUTER_TIMEOUT", 30))
+
+    # Runtime model override (set by UI, takes precedence over env var)
+    runtime_model: Optional[str] = None
+
+    @property
+    def active_model(self) -> str:
+        """Return the active model: runtime override if set, else env default"""
+        return self.runtime_model or self.model
 
 
 @dataclass
@@ -143,6 +155,23 @@ class DeepSeekConfig:
 
 
 @dataclass
+class GeminiDocConfig:
+    """Configuration for Gemini Document Extractor (alternative to Docling)
+
+    Uses Gemini 2.5's native multimodal vision to process PDFs directly,
+    skipping the Docling text extraction step.
+    """
+
+    # API settings
+    api_key: str = field(default_factory=lambda: env_str("GEMINI_API_KEY", ""))
+    model_id: str = field(default_factory=lambda: env_str("GEMINI_DOC_MODEL_ID", "gemini-2.5-flash"))
+
+    # File constraints
+    max_file_size_mb: int = 50  # Gemini File API limit
+    timeout: int = field(default_factory=lambda: env_int("GEMINI_DOC_TIMEOUT", 120))
+
+
+@dataclass
 class ExtractorConfig:
     """Configuration for extractor selection"""
 
@@ -175,7 +204,8 @@ def load_config() -> Tuple[DoclingConfig, LangExtractConfig, ExtractorConfig]:
 def load_provider_config(
     provider: str,
     docling_config: Optional[DoclingConfig] = None,
-    extractor_config: Optional[ExtractorConfig] = None
+    extractor_config: Optional[ExtractorConfig] = None,
+    runtime_model: Optional[str] = None
 ) -> Tuple[DoclingConfig, Any, ExtractorConfig]:
     """Load configuration with provider-specific event extractor config.
 
@@ -183,6 +213,7 @@ def load_provider_config(
         provider: Event extractor provider type.
         docling_config: Optional pre-loaded Docling configuration instance.
         extractor_config: Optional extractor configuration instance to update.
+        runtime_model: Optional runtime model override (for OpenRouter multi-model selection).
 
     Returns:
         Tuple of (DoclingConfig, provider_specific_config, ExtractorConfig) instances.
@@ -195,6 +226,9 @@ def load_provider_config(
 
     if provider_key == "openrouter":
         event_config = OpenRouterConfig()
+        # Set runtime model override if provided (UI selection takes precedence over env var)
+        if runtime_model:
+            event_config.runtime_model = runtime_model
     elif provider_key == "opencode_zen":
         event_config = OpenCodeZenConfig()
     elif provider_key == "openai":

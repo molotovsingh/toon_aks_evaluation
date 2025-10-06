@@ -20,7 +20,7 @@ This is a **proof-of-concept testing environment** for evaluating combinations o
 
 **Event Extractors Supported**:
 - **LangExtract** (Gemini) - Default, uses Google's Gemini 2.0 Flash
-- **OpenRouter** (Unified API) - 11+ tested models from OpenAI, Anthropic, DeepSeek
+- **OpenRouter** (Unified API) - 9 curated models from OpenAI, Anthropic, DeepSeek, Meta, Mistral (Oct 2025 testing)
 - **OpenCode Zen** (Legal AI) - Specialized legal extraction models
 - **OpenAI** (Direct API) - GPT-4o, GPT-4o-mini via OpenAI SDK
 - **Anthropic** (Direct API) - Claude 3.5 Sonnet, Claude 3 Haiku via Anthropic SDK
@@ -188,10 +188,31 @@ These map to the **Five-Column Table**:
 | `DOCLING_TABLE_MODE` | `FAST` | `FAST` or `ACCURATE` |
 | `DOCLING_ACCELERATOR_DEVICE` | `cpu` | `cpu`, `cuda`, or `mps` |
 
-**Tested Model Recommendations** (2025-10-01):
-- Budget champion: `deepseek/deepseek-r1-distill-llama-70b` via OpenRouter ($0.03/M, 10/10 quality)
-- Recommended default: `openai/gpt-4o-mini` via OpenRouter ($0.15/M, 10/10 quality)
-- See `.env.example` for 11+ tested models with quality scores
+**Curated Model Recommendations** (Oct 2025 testing):
+- **Recommended starting point**: `openai/gpt-4o-mini` ($0.15/M, 9/10 quality, 128K context)
+- **Budget champion**: `deepseek/deepseek-r1-distill-llama-70b` ($0.03/M, 10/10 quality, 128K) - 50x cheaper!
+- **Ultra-budget option**: `qwen/qwq-32b` ($0.115/M, 7/10 quality, 128K) - ⚠️ May miss events on complex docs
+- **Speed champion**: `anthropic/claude-3-haiku` ($0.25/M, 10/10 quality, 200K, 4.4s extraction)
+- **Long documents (50+ pages)**: `anthropic/claude-3-5-sonnet` ($3/M, 10/10 quality, 200K context)
+- **Open source option**: `meta-llama/llama-3.3-70b-instruct` ($0.60/M, 10/10 quality, 128K)
+
+Total: 10 battle-tested models (9-10/10 quality, plus 1 budget option at 7/10). **Excluded**: All Gemini variants, Cohere, Perplexity (failed JSON mode tests).
+
+**Oct 5, 2025 Adapter Fix** - Conditional JSON Mode Support:
+- Fixed OpenRouter adapter to support prompt-based JSON (not just native `response_format`)
+- Added markdown wrapper stripping for OSS model compatibility
+- Result: Qwen QwQ 32B now works (7/10 quality, ultra-cheap at $0.115/M)
+
+**Additional exclusions** (Oct 5, 2025 OSS model testing):
+- GPT-OSS 20B/120B: Return empty responses (1/10 quality, fundamentally broken)
+- Mistral Small 3.1: Weak real-doc extraction (7/10 quality, extracted 1 event vs ≥3 expected)
+
+**Key insights**:
+1. Native JSON mode (`response_format`) is NOT mandatory - many models work via prompts
+2. Fixed adapter unlocked Qwen QwQ 32B ($0.115/M, exceptional cost-effectiveness)
+3. Real legal document testing remains essential (Qwen QwQ passes synthetic tests but weak on complex docs)
+
+See `scripts/test_new_oss_models.py` for methodology and `src/core/openrouter_adapter.py:17-31` for JSON mode compatibility list.
 
 ## Development Guidelines
 

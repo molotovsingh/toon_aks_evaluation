@@ -8,11 +8,12 @@ from typing import Tuple, Callable, Dict, Any, Optional
 
 from .interfaces import DocumentExtractor, EventExtractor
 from .config import (
-    DoclingConfig, LangExtractConfig, ExtractorConfig,
+    DoclingConfig, LangExtractConfig, ExtractorConfig, GeminiDocConfig,
     OpenRouterConfig, OpenCodeZenConfig, OpenAIConfig, AnthropicConfig, DeepSeekConfig,
     load_config, load_provider_config
 )
 from .docling_adapter import DoclingDocumentExtractor
+from .gemini_doc_extractor import GeminiDocumentExtractor
 from .langextract_adapter import LangExtractEventExtractor
 from .openrouter_adapter import OpenRouterEventExtractor
 from .opencode_zen_adapter import OpenCodeZenEventExtractor
@@ -26,6 +27,35 @@ logger = logging.getLogger(__name__)
 class ExtractorConfigurationError(ValueError):
     """Raised when extractor provider configuration is invalid."""
 
+
+# Document Extractor Factories
+
+def _create_docling_document_extractor(
+    doc_config: DoclingConfig,
+    _event_config: Any,
+    _extractor_config: ExtractorConfig
+) -> DocumentExtractor:
+    """Factory for the Docling document extractor (local PDF processing)."""
+    return DoclingDocumentExtractor(doc_config)
+
+
+def _create_gemini_document_extractor(
+    _doc_config: DoclingConfig,
+    _event_config: Any,
+    _extractor_config: ExtractorConfig
+) -> DocumentExtractor:
+    """Factory for the Gemini document extractor (cloud multimodal vision)."""
+    gemini_config = GeminiDocConfig()
+    return GeminiDocumentExtractor(gemini_config)
+
+
+DOC_PROVIDER_REGISTRY: Dict[str, Callable[[DoclingConfig, Any, ExtractorConfig], DocumentExtractor]] = {
+    "docling": _create_docling_document_extractor,
+    "gemini": _create_gemini_document_extractor,
+}
+
+
+# Event Extractor Factories
 
 def _create_langextract_event_extractor(
     _doc_config: DoclingConfig,
@@ -118,11 +148,15 @@ def build_extractors(
     logger.info(f"🏭 Building extractors: DOC={doc_extractor_type}, EVENT={event_extractor_type}")
 
     # Create document extractor
-    if doc_extractor_type == "docling":
-        doc_extractor = DoclingDocumentExtractor(docling_config)
-        logger.info("✅ Created DoclingDocumentExtractor")
-    else:
-        raise ValueError(f"Unsupported document extractor type: {doc_extractor_type}")
+    doc_factory = DOC_PROVIDER_REGISTRY.get(doc_extractor_type)
+    if not doc_factory:
+        available = ", ".join(sorted(DOC_PROVIDER_REGISTRY)) or "none"
+        logger.error(f"❌ Unsupported document extractor type: {doc_extractor_type}")
+        raise ExtractorConfigurationError(
+            f"Unsupported document extractor type: {doc_extractor_type}. Available providers: {available}"
+        )
+    doc_extractor = doc_factory(docling_config, None, extractor_config)
+    logger.info(f"✅ Created {doc_extractor.__class__.__name__}")
 
     # Create event extractor
     event_factory = EVENT_PROVIDER_REGISTRY.get(event_extractor_type)
@@ -139,10 +173,17 @@ def build_extractors(
 
 
 def create_default_extractors(
-    event_extractor_override: Optional[str] = None
+    event_extractor_override: Optional[str] = None,
+    runtime_model: Optional[str] = None,
+    doc_extractor_override: Optional[str] = None
 ) -> Tuple[DocumentExtractor, EventExtractor]:
     """
     Create extractors with default configuration from environment
+
+    Args:
+        event_extractor_override: Override the event extractor provider from environment
+        runtime_model: Runtime model selection (for OpenRouter multi-model support)
+        doc_extractor_override: Override the document extractor provider from environment
 
     Returns:
         Tuple of (DocumentExtractor, EventExtractor) instances
@@ -153,11 +194,15 @@ def create_default_extractors(
     if event_extractor_override:
         extractor_config.event_extractor = event_extractor_override
 
+    if doc_extractor_override:
+        extractor_config.doc_extractor = doc_extractor_override
+
     # Load provider-specific configuration based on the event extractor type
     docling_config, event_config, extractor_config = load_provider_config(
         extractor_config.event_extractor,
         docling_config=docling_config,
-        extractor_config=extractor_config
+        extractor_config=extractor_config,
+        runtime_model=runtime_model
     )
 
     return build_extractors(docling_config, event_config, extractor_config)

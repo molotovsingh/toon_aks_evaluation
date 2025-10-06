@@ -14,6 +14,23 @@ from .constants import DEFAULT_NO_DATE, DEFAULT_NO_CITATION, LEGAL_EVENTS_PROMPT
 logger = logging.getLogger(__name__)
 
 
+# Models that support native JSON mode (response_format parameter)
+# Based on OpenRouter provider support and Oct 2025 testing
+JSON_MODE_COMPATIBLE_MODELS = [
+    "openai/gpt-4o",
+    "openai/gpt-4",
+    "openai/gpt-3.5-turbo",
+    "anthropic/claude-3",
+    "anthropic/claude-4",
+    "deepseek/deepseek-chat",
+    "deepseek/deepseek-r1",
+    "meta-llama/llama-3.3-70b-instruct",
+    "meta-llama/llama-3.1-405b-instruct",
+    "mistralai/mistral-large",
+    "mistralai/mistral-small",
+]
+
+
 class OpenRouterEventExtractor:
     """Adapter that wraps OpenRouter API to implement EventExtractor interface"""
 
@@ -38,15 +55,42 @@ class OpenRouterEventExtractor:
                 "OpenRouter API key is required. Set OPENROUTER_API_KEY environment variable."
             )
 
+        # Check if model supports native JSON mode
+        self._supports_json_mode = self._check_json_mode_support(config.active_model)
+        if not self._supports_json_mode:
+            logger.info(
+                f"ℹ️  Model {config.active_model} will use prompt-based JSON (no native response_format support). "
+                f"This is normal for many OSS models."
+            )
+
         # Lazy import HTTP client
         try:
             import requests
             self._http = requests
             self.available = True
-            logger.info("✅ OpenRouterEventExtractor initialized successfully")
+
+            # Log which model is being used (runtime override or env default)
+            active_model = config.active_model
+            if config.runtime_model:
+                logger.info(f"✅ OpenRouterEventExtractor initialized with runtime model: {active_model} (overriding env default: {config.model})")
+            else:
+                logger.info(f"✅ OpenRouterEventExtractor initialized with model: {active_model}")
         except ImportError:
             logger.warning("⚠️ requests library not available - OpenRouter adapter will be disabled")
             self.available = False
+
+    def _check_json_mode_support(self, model: str) -> bool:
+        """
+        Check if the model supports native JSON mode (response_format parameter)
+
+        Args:
+            model: Model identifier (e.g., "openai/gpt-4o-mini")
+
+        Returns:
+            True if model supports response_format=json_object via OpenRouter
+        """
+        model_lower = model.lower()
+        return any(compatible in model_lower for compatible in JSON_MODE_COMPATIBLE_MODELS)
 
     def extract_events(self, text: str, metadata: Dict[str, Any]) -> List[EventRecord]:
         """
@@ -124,11 +168,14 @@ class OpenRouterEventExtractor:
         ]
 
         payload = {
-            "model": self.config.model,
+            "model": self.config.active_model,  # Use active_model (runtime override or env default)
             "messages": messages,
             "temperature": 0.0,
-            "response_format": {"type": "json_object"}
         }
+
+        # Only add response_format if model supports it (otherwise rely on prompt-based JSON)
+        if self._supports_json_mode:
+            payload["response_format"] = {"type": "json_object"}
 
         try:
             response = self._http.post(
@@ -171,6 +218,16 @@ class OpenRouterEventExtractor:
                 logger.warning("⚠️ No content in OpenRouter response")
                 return []
 
+            # Strip markdown code block wrappers if present (common in prompt-based JSON)
+            content = content.strip()
+            if content.startswith("```json"):
+                content = content[7:]  # Remove ```json
+            elif content.startswith("```"):
+                content = content[3:]  # Remove ```
+            if content.endswith("```"):
+                content = content[:-3]  # Remove closing ```
+            content = content.strip()
+
             # Parse JSON content
             try:
                 events_data = json.loads(content)
@@ -207,7 +264,7 @@ class OpenRouterEventExtractor:
                 # Create EventRecord with OpenRouter-specific attributes
                 attributes = {
                     "provider": "openrouter",
-                    "model": self.config.model,
+                    "model": self.config.active_model,  # Use active_model (runtime override or env default)
                     "original_response": event_data
                 }
 
