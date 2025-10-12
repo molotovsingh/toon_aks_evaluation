@@ -17,12 +17,27 @@ logger = logging.getLogger(__name__)
 
 # Models that support native JSON mode (response_format)
 JSON_MODE_COMPATIBLE_MODELS = [
-    "gpt-4o",
+    "gpt-5",           # GPT-5 series (Aug 2025)
+    "gpt-4o",          # GPT-4o series
     "gpt-4-turbo",
     "gpt-4-1106-preview",
     "gpt-4-0125-preview",
     "gpt-3.5-turbo-1106",
     "gpt-3.5-turbo-0125",
+]
+
+# GPT-5 models use new API parameters (max_completion_tokens, temperature=1.0)
+GPT5_MODELS = [
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-5-nano",
+    "gpt-5-pro",
+    "gpt-5-2025-08-07",
+    "gpt-5-mini-2025-08-07",
+    "gpt-5-nano-2025-08-07",
+    "gpt-5-pro-2025-10-06",
+    "gpt-5-chat-latest",
+    "gpt-5-codex",
 ]
 
 
@@ -54,10 +69,18 @@ class OpenAIEventExtractor:
 
         # Validate model supports JSON mode
         self._supports_json_mode = self._check_json_mode_support(config.model)
+        self._is_gpt5 = self._check_gpt5_model(config.model)
+
         if not self._supports_json_mode:
             logger.warning(
                 f"⚠️ Model {config.model} may not support native JSON mode. "
                 f"Compatible models: {', '.join(JSON_MODE_COMPATIBLE_MODELS[:3])}..."
+            )
+
+        if self._is_gpt5:
+            logger.info(
+                f"✅ GPT-5 model detected: {config.model}. "
+                f"Using max_completion_tokens and temperature=1.0"
             )
 
         # Lazy import OpenAI client
@@ -89,6 +112,19 @@ class OpenAIEventExtractor:
         """
         model_lower = model.lower()
         return any(compatible in model_lower for compatible in JSON_MODE_COMPATIBLE_MODELS)
+
+    def _check_gpt5_model(self, model: str) -> bool:
+        """
+        Check if the model is a GPT-5 variant
+
+        Args:
+            model: Model identifier
+
+        Returns:
+            True if model is GPT-5 (requires special API parameters)
+        """
+        model_lower = model.lower()
+        return any(gpt5_model in model_lower for gpt5_model in GPT5_MODELS)
 
     def extract_events(self, text: str, metadata: Dict[str, Any]) -> List[EventRecord]:
         """
@@ -209,11 +245,18 @@ class OpenAIEventExtractor:
         ]
 
         # Call OpenAI API with JSON mode if supported
+        # GPT-5 requires different parameters than GPT-4
         kwargs = {
             "model": self.config.model,
             "messages": messages,
-            "temperature": 0.0,
+            "temperature": 1.0 if self._is_gpt5 else 0.0,
         }
+
+        # GPT-5 uses max_completion_tokens, GPT-4 uses max_tokens
+        if self._is_gpt5:
+            kwargs["max_completion_tokens"] = 4096  # GPT-5 default for legal extraction
+        else:
+            kwargs["max_tokens"] = 4096  # GPT-4 default for legal extraction
 
         if self._supports_json_mode:
             kwargs["response_format"] = {"type": "json_object"}
@@ -255,8 +298,9 @@ class OpenAIEventExtractor:
         Returns:
             Estimated cost in USD
         """
-        # Pricing per 1M tokens (as of 2025-01)
+        # Pricing per 1M tokens (as of 2025-01, GPT-5 pricing TBD - estimated based on GPT-4o)
         pricing = {
+            "gpt-5": (3.00, 12.00),      # GPT-5 series (estimated, pending official pricing)
             "gpt-4o": (2.50, 10.00),
             "gpt-4o-mini": (0.15, 0.60),
             "gpt-4-turbo": (10.00, 30.00),
