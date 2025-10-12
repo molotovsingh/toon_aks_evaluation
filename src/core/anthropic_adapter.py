@@ -248,8 +248,12 @@ class AnthropicEventExtractor:
         Returns:
             Estimated cost in USD
         """
-        # Pricing per 1M tokens (as of 2025-01)
+        # Pricing per 1M tokens (as of 2025-01, Claude 4 series pricing from Anthropic)
         pricing = {
+            # Claude 4 series (2025)
+            "claude-sonnet-4-5": (3.00, 15.00),   # Claude Sonnet 4.5 (Sep 2025)
+            "claude-opus-4": (15.00, 75.00),      # Claude Opus 4 (May 2025)
+            # Claude 3 series (2024)
             "claude-3-5-sonnet": (3.00, 15.00),
             "claude-3-opus": (15.00, 75.00),
             "claude-3-sonnet": (3.00, 15.00),

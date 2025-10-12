@@ -99,11 +99,80 @@ If you discover a security issue:
 4. **Review how the exposure occurred**
 5. **Implement preventive measures**
 
+## Dependency Security
+
+### Recent Changes
+
+#### .EML Email Parsing (2025-10-10)
+**Security Assessment**: ✅ NO NEW DEPENDENCIES
+
+The email parsing functionality (`src/core/email_parser.py`) was implemented using **Python standard library only**:
+- `email.parser.BytesParser` - RFC-compliant email parsing
+- `email.policy.default` - Secure email handling policies
+- `html.parser.HTMLParser` - Safe HTML tag stripping
+
+**Security Benefits**:
+- ✅ No third-party dependency vulnerabilities
+- ✅ No supply chain risks
+- ✅ Standard library maintained by Python core team
+- ✅ No additional security audits required
+
+**Implementation Files**:
+- `src/core/email_parser.py` (259 lines, stdlib only)
+- No changes to `pyproject.toml` or `requirements.txt`
+
+#### Image Processing (JPEG/PNG) (2025-10-10)
+**Security Assessment**: ✅ NO NEW DEPENDENCIES
+
+Native image support implemented using **Docling's built-in image backend**:
+- Uses existing Tesseract/EasyOCR/OCRmac (already configured for PDFs)
+- Docling's `InputFormat.IMAGE` with `PdfPipelineOptions`
+- No new image processing libraries (Pillow, img2pdf, etc.)
+- Docling handles image parsing and OCR securely
+
+**Security Benefits**:
+- ✅ No Pillow dependency (avoids frequent CVEs in image libraries)
+- ✅ Docling image backend maintained by IBM Research
+- ✅ Same OCR engine as PDF processing (security surface unchanged)
+- ✅ No temporary file creation (in-memory processing)
+- ✅ No image conversion dependencies (img2pdf, etc.)
+
+**Implementation Files**:
+- `src/core/document_processor.py` (image format configuration, lines 171-224)
+- `src/utils/file_handler.py` (added jpg/jpeg/png to supported types)
+- `app.py` (updated file uploader)
+- No changes to `pyproject.toml` or `requirements.txt`
+
+### Dependency Audit Process
+
+When adding new dependencies:
+
+1. **Check for known vulnerabilities**:
+   ```bash
+   uv pip list --format=json | uv run safety check --stdin
+   ```
+
+2. **Review dependency tree**:
+   ```bash
+   uv pip tree
+   ```
+
+3. **Verify package authenticity**:
+   - Check PyPI package signatures
+   - Review package maintainer history
+   - Scan for typosquatting risks
+
+4. **Document security review**:
+   - Update this section with dependency name and purpose
+   - Note any security considerations
+   - Link to security audit if conducted
+
 ### Security Resources
 
 - [Google API Security Best Practices](https://cloud.google.com/docs/authentication/best-practices)
 - [OWASP Secrets Management](https://owasp.org/www-community/vulnerabilities/Use_of_hard-coded_cryptographic_key)
 - [Git Secrets Prevention](https://git-secret.io/)
+- [Python Security Best Practices](https://python.readthedocs.io/en/stable/library/security_warnings.html)
 
 ---
 

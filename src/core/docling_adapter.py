@@ -12,6 +12,7 @@ import fitz  # PyMuPDF
 from .interfaces import DocumentExtractor, ExtractedDocument
 from .document_processor import DocumentProcessor
 from .config import DoclingConfig
+from .email_parser import parse_email_file, get_email_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -115,8 +116,9 @@ class DoclingDocumentExtractor:
             # Use DocumentProcessor to get Docling result
             text, extraction_method = processor.extract_text(file_path, file_type)
 
-            if extraction_method == "failed" or not text.strip():
-                # Return empty strings instead of error flags
+            # Check for extraction failure (but allow empty text for images with no text content)
+            if extraction_method == "failed":
+                # True failure - extraction process itself failed
                 return ExtractedDocument(
                     markdown="",
                     plain_text="",
@@ -134,8 +136,11 @@ class DoclingDocumentExtractor:
                     }
                 )
 
+            # Empty text is OK for images (e.g., images with no text content)
+            # Don't treat it as a failure - just return empty result with successful extraction method
+
             # For Docling extractions, get both markdown and plain text
-            if extraction_method == "docling":
+            if extraction_method in ["docling", "docling_image_ocr"]:
                 # Re-run Docling to get both formats (use appropriate processor)
                 result = processor.converter.convert(file_path)
                 markdown = result.document.export_to_markdown()
@@ -145,21 +150,33 @@ class DoclingDocumentExtractor:
                 markdown = text  # Use same content for both
                 plain_text = text
 
+            # Build base metadata
+            metadata = {
+                "file_path": str(file_path),
+                "file_type": file_type,
+                "extraction_method": extraction_method,
+                "needs_ocr": needs_ocr,
+                "ocr_auto_detected": ocr_auto_detected,
+                "config": {
+                    "do_ocr": self.config.do_ocr,
+                    "table_mode": self.config.table_mode,
+                    "backend": self.config.backend
+                }
+            }
+
+            # Add email-specific metadata for .eml files
+            if extraction_method == "email_parser":
+                try:
+                    parsed_email = parse_email_file(file_path)
+                    email_metadata = get_email_metadata(parsed_email)
+                    metadata.update(email_metadata)
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to extract email metadata for {file_path.name}: {e}")
+
             return ExtractedDocument(
                 markdown=markdown,
                 plain_text=plain_text,
-                metadata={
-                    "file_path": str(file_path),
-                    "file_type": file_type,
-                    "extraction_method": extraction_method,
-                    "needs_ocr": needs_ocr,
-                    "ocr_auto_detected": ocr_auto_detected,
-                    "config": {
-                        "do_ocr": self.config.do_ocr,
-                        "table_mode": self.config.table_mode,
-                        "backend": self.config.backend
-                    }
-                }
+                metadata=metadata
             )
 
         except Exception as e:

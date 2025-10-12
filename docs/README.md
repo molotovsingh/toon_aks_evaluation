@@ -16,6 +16,7 @@ The `docs/` directory serves as the central repository for:
 
 ### Architecture Decision Records (ADRs)
 - **[ADR-001: Pluggable Extractors](adr/ADR-001-pluggable-extractors.md)** - Decision record for implementing pluggable document and event extraction interfaces
+- **[ADR-002: Observability with Logfire](adr/ADR-002-observability-with-logfire.md)** - Deferred decision on Pydantic Logfire integration for testing and monitoring (to revisit in production)
 
 ### Orders & Planning
 - **[orders/](orders/)** - Development orders and structured task specifications
@@ -39,7 +40,8 @@ docs/
 ├── README.md                           # This index file
 ├── pluggable_extractors_prd.md         # Core PRD
 ├── adr/                                # Architecture Decision Records
-│   └── ADR-001-pluggable-extractors.md
+│   ├── ADR-001-pluggable-extractors.md
+│   └── ADR-002-observability-with-logfire.md
 ├── orders/                             # Development task orders
 └── reports/                            # Test reports and analysis (planned)
 ```
@@ -60,7 +62,7 @@ docs/
 
 ### 🚀 Deployment & Operations
 - [ ] **Environment Setup Guide** - Production deployment procedures
-- [ ] **Monitoring & Alerting** - Operational observability specifications
+- [x] **Monitoring & Alerting** - Operational observability specifications (see ADR-002, deferred until production)
 - [ ] **Security Guidelines** - API key management and security best practices
 
 ## 🔗 Quick Links

@@ -1,6 +1,7 @@
 """
 Shared Streamlit Utilities - Common functions for all legal events apps
 Ensures consistent pipeline caching, processing, and UI across endpoints
+Includes document extraction cache management utilities
 """
 
 import streamlit as st
@@ -8,7 +9,7 @@ import pandas as pd
 import logging
 import re
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Tuple
 
 from ..core.legal_pipeline_refactored import LegalEventsPipeline
 from ..core.constants import FIVE_COLUMN_HEADERS
@@ -452,3 +453,72 @@ def show_sample_table_format() -> None:
     from ..core.table_formatter import TableFormatter
     sample_df = TableFormatter.create_fallback_dataframe("Sample - no files uploaded yet")
     st.dataframe(sample_df, width='stretch', hide_index=True)
+
+
+# ====================
+# Document Extraction Cache Management
+# ====================
+
+def get_cache_stats() -> Tuple[int, List[str]]:
+    """
+    Get document extraction cache statistics
+
+    Returns:
+        Tuple of (cache_size, list_of_cached_filenames)
+    """
+    cache = st.session_state.get('doc_extraction_cache', {})
+    cache_size = len(cache)
+
+    # Extract filenames from cache keys (format: filename:size:extractor)
+    cached_files = []
+    for cache_key in cache.keys():
+        # Split cache key and get filename part
+        parts = cache_key.split(':', 2)
+        if parts:
+            cached_files.append(parts[0])
+
+    return cache_size, cached_files
+
+
+def clear_document_cache() -> None:
+    """
+    Clear all document extraction cache entries
+    """
+    if 'doc_extraction_cache' in st.session_state:
+        cache_size = len(st.session_state['doc_extraction_cache'])
+        st.session_state['doc_extraction_cache'] = {}
+        logger.info(f"💾 Cleared {cache_size} cache entries")
+
+
+def display_cache_info(location: str = "sidebar") -> None:
+    """
+    Display cache information and clear button
+
+    Args:
+        location: Where to display ('sidebar' or 'main')
+    """
+    cache_size, cached_files = get_cache_stats()
+
+    if location == "sidebar":
+        if cache_size > 0:
+            st.sidebar.caption(f"💾 **Document Cache**: {cache_size} file{'s' if cache_size != 1 else ''}")
+
+            with st.sidebar.expander("Cached Files", expanded=False):
+                for idx, filename in enumerate(cached_files, 1):
+                    st.caption(f"{idx}. {filename}")
+
+            if st.sidebar.button("🗑️ Clear Cache", help="Clear all cached document extractions"):
+                clear_document_cache()
+                st.rerun()
+        else:
+            st.sidebar.caption("💾 Cache: Empty")
+    else:
+        # Main area display
+        if cache_size > 0:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.info(f"💾 **{cache_size} file{'s' if cache_size != 1 else ''} cached** - Switching LLMs will reuse extracted text")
+            with col2:
+                if st.button("Clear Cache"):
+                    clear_document_cache()
+                    st.rerun()

@@ -78,7 +78,12 @@ class DoclingConfig:
 
 @dataclass
 class LangExtractConfig:
-    """Configuration for LangExtract operations"""
+    """Configuration for LangExtract operations
+
+    Default model: gemini-2.0-flash (fast, budget-friendly)
+    Premium models available for ground truth creation:
+    - gemini-2.5-pro: Google's most intelligent AI model (Jun 2025), 2M context window for long documents
+    """
 
     # Model and API settings
     model_id: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL_ID", DEFAULT_MODEL))
@@ -123,7 +128,14 @@ class OpenCodeZenConfig:
 
 @dataclass
 class OpenAIConfig:
-    """Configuration for OpenAI API operations"""
+    """Configuration for OpenAI API operations
+
+    Default model: gpt-4o-mini (budget option)
+    Premium models available for ground truth creation:
+    - gpt-5: Latest flagship model (Aug 2025), best for coding and reasoning
+    - gpt-5-mini: Smaller variant of GPT-5
+    - gpt-4o: Previous flagship model
+    """
 
     # API settings
     api_key: str = field(default_factory=lambda: env_str("OPENAI_API_KEY", ""))
@@ -134,7 +146,15 @@ class OpenAIConfig:
 
 @dataclass
 class AnthropicConfig:
-    """Configuration for Anthropic API operations"""
+    """Configuration for Anthropic API operations
+
+    Default model: claude-3-haiku-20240307 (budget option)
+    Premium models available for ground truth creation:
+    - claude-sonnet-4-5: "Best coding model in the world" (Sep 2025), recommended for ground truth
+    - claude-opus-4: Highest quality model (May 2025), best for complex reasoning
+    - claude-opus-4-1: Enhanced version (Aug 2025)
+    - claude-3-5-sonnet-20241022: Quality baseline from Claude 3.5 series
+    """
 
     # API settings
     api_key: str = field(default_factory=lambda: env_str("ANTHROPIC_API_KEY", ""))
@@ -233,12 +253,24 @@ def load_provider_config(
         event_config = OpenCodeZenConfig()
     elif provider_key == "openai":
         event_config = OpenAIConfig()
+        # Apply runtime model override for ground truth model selection
+        if runtime_model:
+            event_config.model = runtime_model
     elif provider_key == "anthropic":
         event_config = AnthropicConfig()
+        # Apply runtime model override for ground truth model selection
+        if runtime_model:
+            event_config.model = runtime_model
     elif provider_key == "deepseek":
         event_config = DeepSeekConfig()
+        # Apply runtime model override if needed
+        if runtime_model:
+            event_config.model = runtime_model
     else:
         event_config = LangExtractConfig()
+        # Apply runtime model override for Gemini model selection
+        if runtime_model:
+            event_config.model_id = runtime_model
         extractor_config.event_extractor = "langextract"
 
     return docling_config, event_config, extractor_config

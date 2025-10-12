@@ -1,0 +1,97 @@
+{
+  "order_id": "git-housekeeping-001",
+  "status": "SUPERSEDED",
+  "superseded_by": [
+    "git-housekeeping-001-triage.json (Phase 1: Read-only analysis)",
+    "git-housekeeping-001-execute.json (Phase 2: Cleanup execution)"
+  ],
+  "superseded_date": "2025-10-11",
+  "superseded_reason": "Original order attempted single-phase housekeeping which was premature for repositories with uncommitted work. Split into two-phase workflow: (1) triage on dirty repo to guide commits, (2) execute on clean baseline for isolation.",
+  "priority": "medium",
+  "version": "v1.0",
+  "supercontext": {
+    "repository": "docling_langextract_testing",
+    "mission": "Stabilize day-to-day contributor workflow by restoring Git hygiene, documenting the process, and preventing stale branches or artifacts from obscuring active legal event extraction work.",
+    "current_state": [
+      "Recent benchmarking and ADICR runs left CSV and JSON artifacts under config/benchmarks/ and test_results/ that routinely show up in git status.",
+      "docs/reports/ contains ad-hoc housekeeping notes but no single evergreen checklist that agents can reuse.",
+      "Branch lists on local clones include several feature branches with no clear owner or recent commits, making prune decisions hard.",
+      "Existing .gitignore coverage predates new output directories (output/, streamlit_outputs/, prompt_comparison exports) so agents have to manually clean or stash files."
+    ]
+  },
+  "goal": "Audit and clean the repository's Git state, harden ignore rules, prune stale branches, and publish an evergreen housekeeping checklist so future agents inherit a predictable workspace.",
+  "execution_instructions": [
+    "Review SECURITY.md for handling secrets and CLAUDE.md for design mantras before touching Git history.",
+    "Capture every destructive command (branch deletion, git clean, prune) in docs/reports/git-housekeeping-001.md with command output and justification.",
+    "Work on a dedicated feature branch; do not force-push or rewrite shared history without explicit approval from the maintainer.",
+    "Escalate immediately if you discover untracked secrets or branches that appear active but have unclear ownership."
+  ],
+  "tasks": [
+    {
+      "id": "worktree-audit",
+      "description": "Snapshot the current repository state so cleanup actions have a baseline.",
+      "steps": [
+        "Run `git status -sb` and `git status --ignored` to capture tracked, untracked, and ignored files; paste the outputs into docs/reports/git-housekeeping-001.md under an \"Initial Snapshot\" heading.",
+        "List untracked files with `git ls-files --others --exclude-standard` and note which items should become ignored patterns versus files that require review or deletion.",
+        "Document any tracked-but-uncommitted files that might belong to other contributors and flag them in the report for follow-up.",
+        "Tag any sensitive-looking paths (secrets, personal data) in the report so maintainers can double-check before automation is introduced."
+      ]
+    },
+    {
+      "id": "gitignore-hardening",
+      "description": "Ensure transient artifacts never pollute future Git status checks.",
+      "steps": [
+        "Review `.gitignore`, `config/.gitignore`, and any nested ignore files for coverage of generated assets (e.g., `output/`, `streamlit_outputs/`, `test_results/`, temporary CSVs).",
+        "Add targeted ignore rules for recurring artifacts discovered during the audit, keeping patterns specific enough to avoid hiding source files or committed fixtures.",
+        "If ignore rules could mask legitimate contributor work (e.g., generic `*.csv`), document the trade-off and propose alternatives (path-scoped ignores, docs updates).",
+        "Re-run `git status --ignored` to confirm the noisy paths are suppressed, and record before/after observations in docs/reports/git-housekeeping-001.md."
+      ]
+    },
+    {
+      "id": "branch-hygiene",
+      "description": "Prune stale local and remote-tracking branches while preserving useful history.",
+      "steps": [
+        "List local branches sorted by last commit using `git branch --sort=-committerdate` and remote-tracking branches with `git branch -r --sort=-committerdate`; log both tables in the report.",
+        "For local branches already merged into `main`, delete them with `git branch -d <branch>`; if deletion is blocked, document the reason instead of forcing.",
+        "Prune remote-tracking references via `git remote prune origin` after confirming no active work relies on them, and note any branches that require maintainers to delete on the server (`git push origin --delete <branch>`).",
+        "Call out branches with ambiguous status (e.g., last commit < 30 days but no linked PR) in a \"Needs Maintainer Review\" subsection rather than deleting them."
+      ]
+    },
+    {
+      "id": "housekeeping-checklist",
+      "description": "Publish an evergreen checklist so future contributors can repeat the Git hygiene routine.",
+      "steps": [
+        "Create or update `docs/reports/git-housekeeping-001.md` with sections for Initial Snapshot, Actions Taken, Branch Decisions, Test Results, and Next Review Date.",
+        "Add a short reminder in `AGENTS.md` describing the git housekeeping cadence (e.g., monthly) and linking to the new report.",
+        "Update `docs/orders/README.md` to list this order with status and link to the report so it is visible to future contributors.",
+        "If `.gitignore` changes were made, note the rationale and new patterns in the README's development setup section or an appropriate subsection so contributors know what artifacts stay local."
+      ]
+    },
+    {
+      "id": "post-cleanup-validation",
+      "description": "Verify the repository remains functional and clean after housekeeping tasks.",
+      "steps": [
+        "Run `git status -sb` once more to confirm only intentional changes remain (order file updates, ignore tweaks, documentation notes).",
+        "Execute `uv run python tests/run_all_tests.py --quick` to ensure the pipeline still passes smoke tests; capture the command output summary in the report.",
+        "Record any follow-up actions needed (e.g., maintainer confirmation for remote branch deletions) under a \"Pending Items\" section in docs/reports/git-housekeeping-001.md."
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "docs/reports/git-housekeeping-001.md contains the snapshot, actions, branch decisions, test results, and pending follow-ups with supporting command output.",
+    "`.gitignore` (and related ignore files) cover newly identified transient artifacts without suppressing source files, and git status is quiet after cleanup.",
+    "Local stale branches are removed, remote-tracking references are pruned, and any remaining remote deletions are clearly requested in the report.",
+    "AGENTS.md mentions the git housekeeping cadence and points contributors to the latest checklist/report.",
+    "docs/orders/README.md references git-housekeeping-001 so agents can find the housekeeping workflow from the active orders list.",
+    "`uv run python tests/run_all_tests.py --quick` completes successfully (or documented with a skip rationale) after housekeeping changes."
+  ],
+  "constraints": {
+    "what_not_to_do": [
+      "Do not use `git clean -fd` without first running the dry-run variant (`git clean -fdn`) and recording intent; avoid deleting files owned by others.",
+      "Do not force-delete branches (`git branch -D`) or force-push rewritten history unless the maintainer gives explicit approval.",
+      "Do not remove or relax `.gitignore` entries that protect secrets or build artifacts without replacing them with safer patterns.",
+      "Do not delete remote branches directly if you cannot confirm they are merged; escalate instead."
+    ],
+    "escalation_guidance": "If branch ownership, pending work, or potential secrets remain ambiguous after the audit, pause changes and request clarification from the repository maintainer before proceeding."
+  }
+}

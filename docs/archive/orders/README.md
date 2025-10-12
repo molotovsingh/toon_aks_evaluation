@@ -63,5 +63,62 @@ See `docs/orders/` for current development tasks and templates.
 ### Order Template
 See `docs/orders/example-order-template.json` for the standard order format.
 
+---
+
+## 2025-10-09 Archival Batch
+
+**Batch Size**: 15 orders (14 complete + 1 superseded)
+**Audit Reference**: `docs/reports/archive_audit.md`
+**Evidence Verification**: All orders have completion reports in `docs/reports/` or code artifacts
+
+### Completed Orders (14)
+
+1. **adicr-implementation-001.json** - ADICR system implementation (Evidence: `adicr_runlog.md`)
+2. **event-extractor-002.json** - Provider integration (Evidence: `event-extractor-002-completion-report.md`)
+3. **event-extractor-003.json** - Provider integration (Evidence: `event-extractor-003-completion-report.md`)
+4. **api-connection-test.json** - API connectivity validation (Evidence: `api_connection_test_summary.md`)
+5. **streamlit-provider-selector-001.json** - UI provider selection (Evidence: `streamlit-provider-selector-001-completion.md`)
+6. **streamlit-provider-reliability-001.json** - UI reliability improvements (Evidence: `streamlit-provider-reliability-001-completion.md`)
+7. **provider-env-validation-001.json** - Environment validation (Evidence: `provider-env-validation-001-completion.md`)
+8. **performance-timing-001-revised.json** - Timing instrumentation v1.1 (Evidence: `performance-timing-validation.md`)
+9. **docling-fix-parsev4.json** - Docling v4 parsing fix (Evidence: `docling-fix-parsev4.txt`)
+10. **docling-fix-parsev4-verification.json** - Parsev4 verification (Evidence: `docling-fix-parsev4-verification-summary.txt`)
+11. **docling-fix-parsev4-pipeline-options.json** - Pipeline options config (Evidence: `docling-fix-parsev4-pipeline-options-summary.txt`)
+12. **housekeeping-relocate-root.json** - Root file reorganization (Evidence: `relocate-root.txt`, `ultra-verification-relocate-root.txt`)
+13. **docling-ocr-autofallback-001.json** - OCR auto-fallback (Evidence: `ocr_autodetection_implementation.md`)
+14. **provider-config-externalization-001.json** - Config externalization (Evidence: code artifacts in `src/core/config.py`)
+
+### Superseded Orders (1)
+
+- **performance-timing-001.json** - ⚠️ **SUPERSEDED** by `performance-timing-001-revised.json` (v1.1)
+
+---
+
+## 2025-10-09 Additional Archival - orders-readme-001
+
+**Order**: orders-readme-001.json
+**Status**: ✅ COMPLETE (Expanded Scope)
+**Evidence**: `docs/reports/orders-readme-001-completion.md`
+
+### Summary
+
+Created comprehensive README files for order management workflow:
+- `docs/orders/README.md` - Active orders guide (CREATED)
+- `docs/archive/orders/README.md` - Archive documentation (UPDATED with 2025-10-09 batch)
+
+**Note**: Order requested concise pointers (≤150 words), but comprehensive workflow guides were delivered during `order-archival-001` execution. Scope expansion justified by operational need for detailed archival documentation.
+
+**Completion**: Fulfilled during order-archival-001 (inadvertent overlap due to archival workflow requirements)
+
+---
+
+## Archive History
+
+- **2025-10-04**: Initial archive with 4 housekeeping orders
+- **2025-10-09**: Archival batch - 15 development orders (14 complete + 1 superseded)
+- **2025-10-09**: Additional archival - orders-readme-001 (expanded scope)
+
+**Total Archived**: 20 orders (4 housekeeping + 15 development + 1 README)
+
 ## Archive Date
-2025-10-04
+Last Updated: 2025-10-09

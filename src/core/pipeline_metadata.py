@@ -200,7 +200,8 @@ class PipelineMetadata:
                 elif provider_name == 'langextract':
                     provider_model = os.getenv('GEMINI_MODEL_ID', 'gemini-2.0-flash')
                 elif provider_name == 'anthropic':
-                    provider_model = os.getenv('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022')
+                    # Fixed: Match config.py default (claude-3-haiku-20240307)
+                    provider_model = os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307')
                 elif provider_name == 'opencode_zen':
                     provider_model = os.getenv('OPENCODEZEN_MODEL', 'default')
         except Exception:

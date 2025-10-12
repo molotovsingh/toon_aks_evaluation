@@ -37,6 +37,8 @@ venv.bak/
 
 # UV
 .venv/
+.uv-cache/
+.uv_cache/
 
 # IDEs
 .vscode/

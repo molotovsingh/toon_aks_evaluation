@@ -1,6 +1,7 @@
 """
 Refactored Legal Events Pipeline - GUARANTEES five-column output
 Uses centralized components and ALWAYS produces table even on failures
+Includes intelligent document extraction caching to avoid re-processing same files
 """
 
 import pandas as pd
@@ -11,6 +12,12 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
+
+try:
+    import streamlit as st
+    STREAMLIT_AVAILABLE = True
+except ImportError:
+    STREAMLIT_AVAILABLE = False
 
 from ..utils.file_handler import FileHandler
 from ..core.table_formatter import TableFormatter
@@ -48,6 +55,9 @@ class LegalEventsPipeline:
         }
     }
 
+    # Cache configuration
+    CACHE_MAX_FILES = 10  # Maximum number of files to keep in cache
+
     def __init__(self, event_extractor: Optional[str] = None, runtime_model: Optional[str] = None, doc_extractor: Optional[str] = None):
         # Track requested event extractor (default to env)
         requested_provider = event_extractor or os.getenv("EVENT_EXTRACTOR") or "langextract"
@@ -60,6 +70,9 @@ class LegalEventsPipeline:
         # Store provider and runtime model for metadata tracking
         self.provider = self.event_extractor_type
         self.runtime_model = runtime_model
+
+        # Initialize document extraction cache (session-level caching)
+        self._init_document_cache()
 
         # Validate environment with provider-aware checks
         self._validate_environment()
@@ -81,6 +94,52 @@ class LegalEventsPipeline:
             self.document_extractor.__class__.__name__,
             self.event_extractor.__class__.__name__
         )
+
+    def _init_document_cache(self):
+        """
+        Initialize document extraction cache in Streamlit session state
+
+        Cache key format: {filename}:{file_size}:{doc_extractor_type}
+        Stores extracted document results to avoid re-processing same files
+        when switching between different LLM providers
+        """
+        if STREAMLIT_AVAILABLE and hasattr(st, 'session_state'):
+            if 'doc_extraction_cache' not in st.session_state:
+                st.session_state['doc_extraction_cache'] = {}
+                logger.debug("💾 Initialized document extraction cache")
+
+    def _get_cache_key(self, uploaded_file, doc_extractor_type: str) -> str:
+        """
+        Generate cache key for a file
+
+        Args:
+            uploaded_file: Streamlit uploaded file object
+            doc_extractor_type: Type of document extractor (e.g., 'docling', 'gemini')
+
+        Returns:
+            Cache key string
+        """
+        # Get file size from buffer
+        file_size = len(uploaded_file.getbuffer())
+        # Format: filename:size:extractor_type
+        return f"{uploaded_file.name}:{file_size}:{doc_extractor_type}"
+
+    def _evict_old_cache_entries(self):
+        """
+        Evict oldest cache entries if cache exceeds max size
+        Keeps most recent CACHE_MAX_FILES files
+        """
+        if not STREAMLIT_AVAILABLE or not hasattr(st, 'session_state'):
+            return
+
+        cache = st.session_state.get('doc_extraction_cache', {})
+        if len(cache) > self.CACHE_MAX_FILES:
+            # Remove oldest entries (Python 3.7+ dicts maintain insertion order)
+            num_to_remove = len(cache) - self.CACHE_MAX_FILES
+            for _ in range(num_to_remove):
+                oldest_key = next(iter(cache))
+                del cache[oldest_key]
+                logger.debug(f"💾 Evicted cache entry: {oldest_key}")
 
     def _validate_environment(self):
         """
@@ -245,6 +304,7 @@ class LegalEventsPipeline:
     def _process_single_file_guaranteed(self, uploaded_file, temp_path: Path) -> List[Dict]:
         """
         Process single file with guaranteed record generation
+        Uses intelligent caching to avoid re-extracting same files
 
         Args:
             uploaded_file: Streamlit uploaded file
@@ -258,20 +318,43 @@ class LegalEventsPipeline:
         docling_seconds = None
         extractor_seconds = None
         total_seconds = None
+        cache_hit = False
 
         try:
-            # Save file
-            file_path = self.file_handler.save_uploaded_file(uploaded_file, temp_path)
-            file_extension = self.file_handler.get_file_extension(file_path)
+            # Generate cache key for this file
+            cache_key = self._get_cache_key(uploaded_file, self.doc_extractor_type)
 
-            # Use document extractor adapter for text extraction (with timing)
-            if timing_enabled:
-                start_docling = time.perf_counter()
+            # Try to retrieve from cache first
+            doc_result = None
+            if STREAMLIT_AVAILABLE and hasattr(st, 'session_state'):
+                cache = st.session_state.get('doc_extraction_cache', {})
+                if cache_key in cache:
+                    doc_result = cache[cache_key]
+                    docling_seconds = 0.0  # Instant from cache
+                    cache_hit = True
+                    logger.info(f"💾 Cache HIT: {uploaded_file.name} (skipping Docling extraction)")
 
-            doc_result = self.document_extractor.extract(file_path)
+            # Cache miss - extract document fresh
+            if doc_result is None:
+                # Save file
+                file_path = self.file_handler.save_uploaded_file(uploaded_file, temp_path)
+                file_extension = self.file_handler.get_file_extension(file_path)
 
-            if timing_enabled:
-                docling_seconds = time.perf_counter() - start_docling
+                # Use document extractor adapter for text extraction (with timing)
+                if timing_enabled:
+                    start_docling = time.perf_counter()
+
+                doc_result = self.document_extractor.extract(file_path)
+
+                if timing_enabled:
+                    docling_seconds = time.perf_counter() - start_docling
+
+                # Store in cache for future use
+                if STREAMLIT_AVAILABLE and hasattr(st, 'session_state'):
+                    st.session_state['doc_extraction_cache'][cache_key] = doc_result
+                    # Evict old entries if cache is full
+                    self._evict_old_cache_entries()
+                    logger.info(f"💾 Cached: {uploaded_file.name} ({docling_seconds:.2f}s extraction time)")
 
             # If document extraction failed completely
             if not doc_result.plain_text.strip():

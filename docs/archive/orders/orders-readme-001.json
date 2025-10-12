@@ -1,0 +1,45 @@
+{
+  "order_id": "orders-readme-001",
+  "priority": "low",
+  "version": "v1.0",
+  "supercontext": {
+    "repository": "docling_langextract_testing",
+    "mission": "Give contributors quick context when they land in orders/ directories by adding lightweight README pointers."
+  },
+  "goal": "Add concise README files to docs/orders/ and docs/archive/orders/ that explain how to use the directories, where to find archived orders, and how to add new ones.",
+  "execution_instructions": [
+    "Keep the README text short (≤150 words each) and link to existing guidance instead of duplicating long sections.",
+    "Follow repository tone and formatting conventions (heading, bullet list for key actions).",
+    "If a README already exists, extend it rather than replacing; otherwise create a new file."
+  ],
+  "tasks": [
+    {
+      "id": "docs-orders-readme",
+      "description": "Author docs/orders/README.md for active orders.",
+      "steps": [
+        "Create docs/orders/README.md with an overview, instructions for drafting new orders (link to example-order-template.json), and a reminder to archive completed orders.",
+        "Reference docs/orders/order-archival-001.json and docs/reports/archive_audit.md so future agents know where archival guidance lives."
+      ]
+    },
+    {
+      "id": "archive-readme-update",
+      "description": "Ensure docs/archive/orders/README.md reflects the new flow.",
+      "steps": [
+        "Review the existing README and add a short section describing how archived orders should cite their completion evidence.",
+        "Link back to docs/orders/README.md so users can jump between active and archived guidance."
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "docs/orders/README.md exists with overview, template pointer, and archival reminder.",
+    "docs/archive/orders/README.md mentions the archival log/report locations and cross-links back to docs/orders/README.md.",
+    "README text stays succinct and does not duplicate long instructions already documented elsewhere."
+  ],
+  "constraints": {
+    "what_not_to_do": [
+      "Do not duplicate large sections from README.md or AGENTS.md; link instead.",
+      "Do not introduce directory-specific scripts or automation in this order—documentation only.",
+      "Do not remove historical notes from docs/archive/orders/README.md."
+    ]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "order_id": "openrouter-gpt5-ux-001",
+  "priority": "medium",
+  "version": "v1.0",
+  "supercontext": {
+    "repository": "docling_langextract_testing",
+    "mission": "Ensure GPT-5 appears in the Streamlit model selector when users rely on OpenRouter for provider switching."
+  },
+  "goal": "Update the unified model catalog and selector logic so GPT-5 is discoverable and selectable from the OpenRouter tab, while keeping configuration guards intact.",
+  "execution_instructions": [
+    "Review CLAUDE.md and AGENTS.md for UI guardrails before editing the Streamlit app.",
+    "Load environment variables from .env to replicate the current UX.",
+    "If any instruction conflicts with the repository guardrails, pause and escalate."
+  ],
+  "tasks": [
+    {
+      "id": "review-current-state",
+      "description": "Confirm how GPT-5 is exposed in the UI today.",
+      "steps": [
+        "Run `uv run streamlit run app.py` and verify that GPT-5 only appears under the direct OpenAI provider when `OPENAI_API_KEY` is set.",
+        "Document the observed behavior (screenshots or notes) showing GPT-5 missing from the OpenRouter selector."
+      ]
+    },
+    {
+      "id": "update-model-catalog",
+      "description": "Add GPT-5 metadata to the OpenRouter catalog.",
+      "steps": [
+        "Edit `app.py` to extend the OpenRouter section of `MODEL_CATALOG` with a `ModelConfig` entry for `openai/gpt-5`.",
+        "Make sure cost/context fields align with the OpenAI entry and add a badge noting that availability depends on OpenRouter account access.",
+        "Confirm `create_unified_model_selector('openrouter')` surfaces GPT-5 in both the default list and search results."
+      ]
+    },
+    {
+      "id": "ux-guardrails",
+      "description": "Ensure users receive clear guidance if GPT-5 is unavailable.",
+      "steps": [
+        "Check how the UI behaves when GPT-5 is selected but the OpenRouter key lacks access; add an inline warning or tooltip if selection fails.",
+        "Verify the direct OpenAI selector still works and displays GPT-5 without regression."
+      ]
+    },
+    {
+      "id": "document-and-test",
+      "description": "Record the change and verify behavior.",
+      "steps": [
+        "Update `docs/reports/adicr-latest.md` or the relevant UX changelog with a short note about the selector update.",
+        "Run `uv run python -m unittest discover -s tests -p \"test_classification_prompt.py\"` to ensure nearby tests still pass.",
+        "Capture screenshots or textual evidence from the updated UI showing GPT-5 in the OpenRouter search results."
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "GPT-5 appears in the OpenRouter model list and is searchable via terms like 'gpt 5' or 'ground truth'.",
+    "Selecting GPT-5 via OpenRouter updates the pipeline status badge and does not crash the UI.",
+    "Direct OpenAI provider selection continues to show GPT-5 without regression.",
+    "Documentation or release notes mention the UX change."
+  ],
+  "constraints": {
+    "what_not_to_do": [
+      "Do not remove existing OpenAI catalog entries or change pricing metadata without product sign-off.",
+      "Do not bypass Streamlit session-state patterns already in place for model selection.",
+      "Do not commit screenshots with sensitive data (redact file names if necessary)."
+    ],
+    "escalation_guidance": "If OpenRouter still rejects GPT-5 requests after the UI change, capture the HTTP error payload and surface it in the work summary for product follow-up."
+  },
+  "testing": {
+    "required_commands": [
+      "uv run streamlit run app.py",
+      "uv run python -m unittest discover -s tests -p \"test_classification_prompt.py\""
+    ],
+    "notes": "Streamlit run is for manual verification; exit the server cleanly after confirming GPT-5 availability."
+  }
+}

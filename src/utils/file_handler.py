@@ -15,7 +15,7 @@ class FileHandler:
     """Handles file operations and temporary file management"""
 
     def __init__(self):
-        self.supported_extensions = ['pdf', 'docx', 'txt', 'pptx', 'html', 'eml', 'msg']
+        self.supported_extensions = ['pdf', 'docx', 'txt', 'pptx', 'html', 'eml', 'msg', 'jpg', 'jpeg', 'png']
 
     def save_uploaded_file(self, uploaded_file, temp_dir: Path) -> Path:
         """

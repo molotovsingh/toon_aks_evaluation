@@ -1,0 +1,61 @@
+{
+  "order_id": "order-archival-001",
+  "priority": "medium",
+  "version": "v1.0",
+  "supercontext": {
+    "repository": "docling_langextract_testing",
+    "mission": "Keep docs/orders/ limited to active work by relocating completed or superseded orders into docs/archive/orders/ with a verified status trail."
+  },
+  "goal": "Archive fulfilled development orders, document their completion references, and refresh contributor guidance so active collaborators only see current work.",
+  "execution_instructions": [
+    "Confirm the orders you intend to archive are fully satisfied and already have completion evidence in docs/reports/ or equivalent logs.",
+    "Favor structured moves (copy then delete) instead of drag-and-drop so Git diffs remain reviewable.",
+    "If an order contains sensitive information or secrets, scrub the contents before moving it; otherwise preserve the file as-is for historical context.",
+    "Pause if any order appears partially complete or lacks evidence—capture a note in docs/reports/archive_audit.md instead of moving it blindly."
+  ],
+  "tasks": [
+    {
+      "id": "active-inventory",
+      "description": "Inventory candidate orders in docs/orders/ that are complete or deprecated.",
+      "steps": [
+        "List JSON files under docs/orders/ excluding templates and still-active orders (e.g., example-order-template.json, current provider tasks).",
+        "For each candidate, locate supporting completion proof (docs/reports/*.md, run logs, or merged PR references).",
+        "Create docs/reports/archive_audit.md summarizing which orders are ready to archive, including the evidence file path for each."
+      ]
+    },
+    {
+      "id": "archive-move",
+      "description": "Relocate completed orders and ensure history stays traceable.",
+      "steps": [
+        "For every order flagged in archive_audit.md, move the JSON file into docs/archive/orders/ preserving the filename.",
+        "If docs/archive/orders/README.md exists, append a short entry under an appropriate heading noting the move and referencing the supporting report.",
+        "Update docs/orders/README.md (or create it if missing) with a link to the archive and brief instructions on when to relocate finished orders."
+      ]
+    },
+    {
+      "id": "guidance-refresh",
+      "description": "Ensure contributor guidance reflects the new archival workflow.",
+      "steps": [
+        "Update README.md or AGENTS.md with a one-liner reminding agents to archive fulfilled orders and consult docs/reports/archive_audit.md before creating duplicates.",
+        "If docs/reports/archive_audit.md contains TODOs (orders lacking evidence), highlight them in the guidance note so future agents know follow-up is required.",
+        "Optional: add a short Streamlit UI or CLI note (if relevant) pointing to the archival instructions for agents using the UI tooling."
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "docs/orders/ contains only active orders plus reference templates after the archival move.",
+    "docs/archive/orders/ is updated with the relocated JSON files and a README entry noting the archival batch.",
+    "docs/reports/archive_audit.md lists archived orders, their evidence locations, and any remaining follow-ups.",
+    "Contributor guidance (README.md or AGENTS.md) references the archival flow so future contributors know the process.",
+    "No partially complete orders are accidentally archived; candidates without proof stay in docs/orders/ with a note in archive_audit.md."
+  ],
+  "constraints": {
+    "what_not_to_do": [
+      "Do not delete order history—always preserve the JSON content by moving it into docs/archive/orders/.",
+      "Do not archive an order lacking a completion report or equivalent evidence; record it in archive_audit.md instead.",
+      "Do not rename orders during archival unless necessary for clarity; if renaming is unavoidable, document the old/new names in archive_audit.md.",
+      "Do not stage generated artifacts beyond docs/reports/archive_audit.md without explicit approval."
+    ],
+    "escalation_guidance": "If you discover active work depending on an order you plan to archive, stop and clarify ownership before moving it."
+  }
+}

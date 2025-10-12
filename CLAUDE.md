@@ -164,6 +164,46 @@ These map to the **Five-Column Table**:
 - All adapters use this same prompt via import
 - Test with all providers before committing changes
 
+#### Prompt Versions and Rollback
+
+The system supports **two prompt versions** with instant rollback capability:
+
+**V1 (Baseline)**: Current production prompt
+**V2 (Enhanced)**: Improved granularity and recall (2025-10-11)
+- Date granularity rule: Separate event per distinct dated action
+- Interim milestones guidance: Inspections, negotiations, status updates
+- Limited details handling: Create events even with partial info
+- Refined flexibility: 1-8 sentences as appropriate
+
+**Feature Flag Toggle**:
+```bash
+# Use V1 (default - baseline)
+# (no environment variable needed)
+
+# Use V2 (enhanced prompt)
+USE_ENHANCED_PROMPT=true
+```
+
+**A/B Testing**:
+```bash
+# Test baseline prompt
+uv run python scripts/test_openrouter.py
+
+# Test enhanced prompt
+USE_ENHANCED_PROMPT=true uv run python scripts/test_openrouter.py
+```
+
+**Rollback Options**:
+1. **Instant**: Remove `USE_ENHANCED_PROMPT` from `.env` (reverts to V1)
+2. **Git**: `git checkout HEAD -- src/core/constants.py`
+3. **Emergency**: Both prompts in code - toggle is non-destructive
+
+**Expected Improvements** (based on 2025-10-03 benchmarks):
+- Gemini: 83 events → 40-50 (reduced noise)
+- Anthropic: 2 events → 6-10 (better recall)
+- OpenRouter/OpenAI: 4-6 events → 8-12 (more complete)
+- Variance: 41x → 10x (improved consistency)
+
 ### Configuration System
 
 #### Provider Selection
@@ -213,6 +253,77 @@ Total: 10 battle-tested models (9-10/10 quality, plus 1 budget option at 7/10). 
 3. Real legal document testing remains essential (Qwen QwQ passes synthetic tests but weak on complex docs)
 
 See `scripts/test_new_oss_models.py` for methodology and `src/core/openrouter_adapter.py:17-31` for JSON mode compatibility list.
+
+#### Runtime Model Override (Ground Truth Model Selection)
+
+The system supports **runtime model selection** for all providers through the `runtime_model` parameter, enabling ground truth dataset creation with premium models.
+
+**Architecture Pattern**:
+- **UI Layer** (`app.py`): Model selector dropdowns pass `runtime_model` to pipeline
+- **Config Layer** (`config.py:load_provider_config()`): Applies `runtime_model` override to provider config
+- **Adapter Layer**: Each adapter uses `config.model` (or `config.model_id` for Gemini) from config object
+
+**Provider-Specific Implementation**:
+```python
+# OpenAI/Anthropic/DeepSeek pattern
+if runtime_model:
+    event_config.model = runtime_model
+
+# LangExtract/Gemini pattern (different field name)
+if runtime_model:
+    event_config.model_id = runtime_model
+
+# OpenRouter pattern (special property)
+if runtime_model:
+    event_config.runtime_model = runtime_model  # Uses @property active_model
+```
+
+**Ground Truth Models**:
+- **Tier 1 (Recommended)**: Claude Sonnet 4.5 (`claude-sonnet-4-5`) - $3/M, best balance
+- **Tier 2 (Alternative)**: GPT-5 (`gpt-5`), Gemini 2.5 Pro (`gemini-2.5-pro`) - pending pricing
+- **Tier 3 (Validation)**: Claude Opus 4 (`claude-opus-4`) - $15/M, highest quality
+
+**Model Selectors in UI** (`app.py:249-384`):
+- `create_anthropic_model_selector()` - Claude Sonnet 4.5, Opus 4, plus production models
+- `create_openai_model_selector()` - GPT-5, GPT-4o, GPT-4o-mini
+- `create_langextract_model_selector()` - Gemini 2.5 Pro, 2.0 Flash
+
+**How It Works**:
+1. User selects provider → Provider-specific model selector appears
+2. User selects model → Dropdown returns model identifier string
+3. `create_provider_selection()` returns `(provider, selected_model)` tuple
+4. Pipeline call: `process_documents_with_spinner(provider=..., runtime_model=...)`
+5. Factory creates adapter with overridden model via `load_provider_config(provider, runtime_model=...)`
+
+**Configuration Precedence** (highest to lowest):
+1. UI `runtime_model` parameter (user selection)
+2. Environment variable (`OPENAI_MODEL`, `ANTHROPIC_MODEL`, `GEMINI_MODEL_ID`)
+3. Config dataclass default (defined in `config.py`)
+
+**Use Cases**:
+- **Ground Truth Creation**: Process documents with premium models to create reference datasets
+- **A/B Testing**: Compare production vs premium model outputs on same documents
+- **Quality Validation**: Verify production model extractions against ground truth
+- **Cost Optimization**: Test if cheaper models match ground truth quality
+
+**Example Workflow**:
+```bash
+# 1. Create ground truth with Claude Sonnet 4.5
+uv run streamlit run app.py
+# Select "Anthropic" → "Claude Sonnet 4.5" → Process docs → Export as ground_truth.csv
+
+# 2. Test production model against ground truth
+# Select "Anthropic" → "Claude 3 Haiku" → Process same docs → Export as production.csv
+
+# 3. Compare outputs
+uv run python scripts/compare_extractions.py ground_truth.csv production.csv
+```
+
+**Implementation Files**:
+- Model constants: `src/core/constants.py:74-99`
+- Config override logic: `src/core/config.py:224-277`
+- UI selectors: `app.py:249-384` and `app.py:602-663`
+- Adapter implementations: `src/core/{openai,anthropic,langextract}_adapter.py`
 
 ## Development Guidelines
 

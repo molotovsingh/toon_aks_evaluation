@@ -1,0 +1,67 @@
+{
+  "order_id": "doc-classification-claude-001",
+  "priority": "high",
+  "version": "v1.0",
+  "supercontext": {
+    "repository": "docling_langextract_testing",
+    "mission": "Evaluate small hosted models for the upcoming document classification layer and deliver reproducible results that future agents can build upon."
+  },
+  "goal": "Use the new classification prompt + CLI harness to benchmark multiple small models (Claude Haiku, GPT-4o-mini, others if available) across representative legal documents, then capture findings and next-step recommendations.",
+  "execution_instructions": [
+    "Review CLAUDE.md and AGENTS.md before modifying code or running scripts.",
+    "Load environment variables from .env (already populated on this machine) so hosted providers authenticate correctly.",
+    "If any command fails twice, stop and record the failure in the work summary before escalating."
+  ],
+  "tasks": [
+    {
+      "id": "prepare-samples",
+      "description": "Curate the evaluation set and confirm prompt coverage.",
+      "steps": [
+        "Read src/core/classification_prompt.py to understand the label set and prompt structure.",
+        "Select at least three documents per target class from test_documents/, tests/test_documents/, sample_pdf/amrapali_case/, and sample_pdf/famas_dispute/.",
+        "Document the chosen file paths in your working notes to ensure transparency.",
+        "Run the dry-run harness to confirm Docling extraction works for each file: `uv run python scripts/classify_documents.py --files <file1> <file2> ... --max-chars 1600`."
+      ]
+    },
+    {
+      "id": "execute-model-bench",
+      "description": "Call hosted small models and capture raw outputs.",
+      "steps": [
+        "For each selected document, run the classifier with Claude 3 Haiku and GPT-4o-mini using `uv run python scripts/classify_documents.py --execute --model anthropic/claude-3-haiku --files <...>` and `uv run python scripts/classify_documents.py --execute --model openai/gpt-4o-mini --files <...>`.",
+        "If Gemini Flash or another small model is accessible, attempt the same run; if the API rejects the request, record the HTTP status and body in the summary.",
+        "Ensure outputs land under output/classification/ with distinct JSON files per (document, model) pair."
+      ]
+    },
+    {
+      "id": "analyze-results",
+      "description": "Aggregate classification outcomes and recommend follow-up work.",
+      "steps": [
+        "Create `docs/reports/classification-small-models.md` (or update if it exists) summarizing predicted primary classes, confidence, and rationales by document and model.",
+        "Highlight disagreements or low-confidence predictions and note any prompt adjustments worth trying next.",
+        "List recommended next actions (e.g., expand dataset, integrate into Streamlit) so downstream agents have a clear runway."
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "At least three documents per target class are classified by two hosted models and stored in output/classification/ as JSON artifacts.",
+    "The new report in docs/reports/ concisely presents results, callouts, and proposed next steps.",
+    "All commands executed are reproducible via the log (include exact CLI invocations in the final summary).",
+    "No secrets or environment values are committed to the repository; .env remains unchanged."
+  ],
+  "constraints": {
+    "what_not_to_do": [
+      "Do not modify existing extraction adapters or pipeline wiring beyond what is necessary for the script runs.",
+      "Do not hard-code credentials; rely on environment variables already present in .env.",
+      "Do not delete or overwrite existing benchmark outputs—add new files alongside them."
+    ],
+    "escalation_guidance": "If a provider denies access or rate-limits requests, capture the error payload, stop further calls to that provider, and surface the issue in the work summary."
+  },
+  "testing": {
+    "required_commands": [
+      "uv run python -m unittest discover -s tests -p \"test_classification_prompt.py\"",
+      "uv run python scripts/classify_documents.py --files <sample files> --max-chars 1600",
+      "uv run python scripts/classify_documents.py --execute --model anthropic/claude-3-haiku --files <sample files>"
+    ],
+    "notes": "Hosted model commands rely on API keys loaded from .env; ensure OPENROUTER_API_KEY and provider-specific keys are present."
+  }
+}

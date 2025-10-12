@@ -1,0 +1,72 @@
+{
+  "order_id": "adicr-implementation-001",
+  "priority": "high",
+  "version": "v1.0",
+  "supercontext": {
+    "repository": "docling_langextract_testing",
+    "mission": "Stand up the Automated Documentation Integrity and Coverage Report (ADICR) workflow so contributors can detect doc drift in lockstep with extractor features."
+  },
+  "goal": "Create an automated ADICR generator that inventories code, compares it against required docs, and emits a repeatable report under docs/reports/.",
+  "execution_instructions": [
+    "Review README.md, CLAUDE.md, and docs/reports/documentation_accuracy_review_2025-10-04.md before touching code to understand the current documentation gaps.",
+    "Follow the design mantras in CLAUDE.md: start with a minimal vertical slice, then layer optional enrichment.",
+    "Favor existing helper utilities under src/utils/ when reading files; do not embed brittle path assumptions.",
+    "If any dependency or command fails in the sandbox, pause and escalate instead of forcing partial output."
+  ],
+  "tasks": [
+    {
+      "id": "baseline-inventory",
+      "description": "Capture the authoritative list of documentation touchpoints that ADICR must validate.",
+      "steps": [
+        "Enumerate provider-aware modules (src/core/config.py, src/core/extractor_factory.py, app.py) and capture their canonical provider lists.",
+        "Catalog documentation surfaces that must mirror those lists (README.md provider table, docs/pluggable_extractors_prd.md, ADR-001, CLAUDE.md).",
+        "Record the mapping in a machine-readable manifest (e.g., JSON under config/adicr_targets.json) with fields for source path, doc path, and comparison keys."
+      ]
+    },
+    {
+      "id": "adicr-engine",
+      "description": "Implement an automated report generator that compares code reality to documentation promises.",
+      "steps": [
+        "Create scripts/generate_adicr_report.py that loads the manifest, parses target files, and computes drift (missing providers, stale env vars, mismatched instructions).",
+        "Reuse existing parsing helpers or introduce a focused utility under src/utils/adicr_helpers.py with type hints and docstrings.",
+        "Emit a markdown report at docs/reports/adicr-latest.md with sections for provider parity, environment variable coverage, and remediation checklist.",
+        "Serialize machine-readable findings (JSON) to output/adicr/adicr_report.json for downstream tooling."
+      ]
+    },
+    {
+      "id": "docs-and-config-refresh",
+      "description": "Document the ADICR workflow and wire it into contributor guidance.",
+      "steps": [
+        "Update README.md quick start/testing sections with a short blurb on running ADICR and interpreting the generated markdown.",
+        "Add a note to AGENTS.md reminding future agents to execute ADICR before closing documentation-heavy orders.",
+        "If new environment toggles are required, append placeholders and descriptions to .env.example and reference them in docs/README.md."
+      ]
+    },
+    {
+      "id": "verification-and-handoff",
+      "description": "Validate the automation and capture evidence for future agents (Claude included).",
+      "steps": [
+        "Run `uv run python scripts/generate_adicr_report.py --refresh` from the repo root and confirm markdown + JSON artifacts land in the expected directories.",
+        "Add smoke coverage: extend tests/run_all_tests.py or a dedicated pytest (tests/test_adicr_report.py) with fixture-based verification of the manifest parser.",
+        "Log outcomes in docs/reports/adicr_runlog.md summarizing command, timestamp, and whether discrepancies were found.",
+        "Stage new artifacts intentionally; do not commit generated reports unless they are part of acceptance criteria."
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "scripts/generate_adicr_report.py produces both docs/reports/adicr-latest.md and output/adicr/adicr_report.json with provider and env-var parity sections.",
+    "config/adicr_targets.json (or equivalent manifest) lists every provider-bound module and doc pairing, and tests assert its schema.",
+    "README.md and AGENTS.md mention how to execute ADICR and what actions contributors should take when discrepancies appear.",
+    "`uv run python scripts/generate_adicr_report.py --refresh` and the accompanying automated test suite succeed without missing dependency errors.",
+    "docs/reports/adicr_runlog.md records at least one successful ADICR execution with timestamp and summary."
+  ],
+  "constraints": {
+    "what_not_to_do": [
+      "Do not hardcode credential values or leak secrets inside the manifest or generated reports.",
+      "Do not replace existing documentation manually; rely on ADICR findings to guide future updates.",
+      "Do not commit bulky generated evidence (CSV, HTML) outside of the sanctioned docs/reports and output/adicr paths.",
+      "Do not bypass unit tests—new utilities must include coverage aligned with repository testing guidelines."
+    ],
+    "escalation_guidance": "If provider parsing cannot be automated without brittle regexes or if the sandbox blocks necessary commands, stop and request clarification before shipping a partial ADICR."
+  }
+}

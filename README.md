@@ -157,10 +157,70 @@ export DEEPSEEK_API_KEY=your_deepseek_api_key_here
 
 **Note**: The Streamlit UI selector takes precedence over the environment variable during interactive sessions.
 
+### 3. **Ground Truth Model Selection** (Premium Models)
+
+The UI now supports **runtime model selection** within each provider for creating **ground truth extraction datasets**. Ground truth datasets serve as reference benchmarks for validating cheaper production models.
+
+#### Available Ground Truth Models
+
+**Anthropic (Direct API):**
+- **Claude Sonnet 4.5** (Tier 1) - `claude-sonnet-4-5`
+  - $3/M input • $15/M output • 200K context
+  - "Best coding model in the world" (Sep 2025), recommended for ground truth
+  - Best balance of quality, cost, and speed
+- **Claude Opus 4** (Tier 3) - `claude-opus-4`
+  - $15/M input • $75/M output • 200K context
+  - Highest quality model (May 2025), best for complex reasoning
+  - Use for quality validation of Tier 1 outputs
+
+**OpenAI (Direct API):**
+- **GPT-5** (Tier 2) - `gpt-5`
+  - $TBD • 128K context (Aug 2025)
+  - Latest flagship model, best for coding and reasoning
+  - Pricing pending official announcement
+
+**LangExtract (Google Gemini):**
+- **Gemini 2.5 Pro** (Tier 2) - `gemini-2.5-pro`
+  - $TBD • 2M context (Jun 2025)
+  - Most intelligent AI model from Google
+  - Ideal for long documents (50+ pages) due to 2M context window
+
+#### How to Use Ground Truth Models
+
+1. **Run the Streamlit app**: `uv run streamlit run app.py`
+2. **Select a provider** (Anthropic, OpenAI, or LangExtract)
+3. **Choose a ground truth model** from the dropdown selector
+4. **Process documents** to create reference extraction dataset
+5. **Export results** (CSV/JSON/XLSX) for comparison with production model outputs
+
+#### Tier System
+
+- **Tier 1 (Recommended)**: Claude Sonnet 4.5 - best balance for most use cases
+- **Tier 2 (Alternative)**: GPT-5, Gemini 2.5 Pro - pending pricing or specialized use (long docs)
+- **Tier 3 (Validation)**: Claude Opus 4 - highest quality, use sparingly for validation
+
+#### Cost Comparison
+
+| Model Type | Cost per 15-page doc | Use Case |
+|------------|---------------------|----------|
+| **Production Models** | $0.001-0.005 | Daily processing (GPT-4o-mini, Claude Haiku, Gemini 2.0 Flash) |
+| **Ground Truth Models** | $0.02-0.10 | Reference datasets (5-20x more expensive) |
+
+**Recommendation**: Use ground truth models sparingly to create reference datasets, then test production models against those references. Ground truth extractions serve as quality benchmarks for validating cheaper models.
+
+#### Model Selection Architecture
+
+The system supports **runtime model override** for all providers:
+- **UI Selection**: Model dropdown in provider section (takes precedence)
+- **Environment Variable**: Set `OPENAI_MODEL`, `ANTHROPIC_MODEL`, or `GEMINI_MODEL_ID` for defaults
+- **Pipeline Integration**: Model selection passed to `process_documents_with_spinner(runtime_model=...)`
+
+See `.env.example` for detailed model configuration examples.
+
 ## 📊 What Gets Tested
 
 ### Core Pipeline:
-1. **📄 Docling** - Extracts text from legal documents (PDF, DOCX, TXT, PPTX, HTML)
+1. **📄 Docling** - Extracts text from legal documents (PDF, DOCX, TXT, PPTX, HTML, EML)
 2. **🌍 Langextract** - Detects document language
 3. **📅 Date Extraction** - Finds and normalizes dates (the key business value)
 
@@ -169,6 +229,187 @@ export DEEPSEEK_API_KEY=your_deepseek_api_key_here
 - **Date Extraction Results** (number of dates found)
 - **Pipeline Success** (successful text extraction + date extraction)
 - **Language Detection** accuracy
+
+## 📧 Email File Support (.EML)
+
+The pipeline supports **native .eml email file parsing** using Python's standard library (no additional dependencies). Email files are processed through a specialized parser that extracts clean, readable text suitable for legal event extraction.
+
+### What Gets Extracted
+
+- **Email Headers**: Subject, From, To, Cc, Date, Message-ID (stored in `metadata`)
+- **Body Text**: Plain text content with automatic decoding of quoted-printable and base64 encodings
+- **HTML Handling**: HTML emails are automatically converted to plain text (HTML tags stripped)
+- **Attachments**: Shown as human-readable summaries with filenames and sizes (attachments not extracted)
+
+### Quality Improvements
+
+Compared to raw .eml file reading, the parser provides:
+- ✅ **No MIME boundaries** - All `------=_NextPart_000...` markers removed
+- ✅ **Decoded encodings** - Quoted-printable (`=20`, `=E2=80=9C`) automatically decoded
+- ✅ **Clean text** - MIME headers and Content-Type declarations removed from body
+- ✅ **~74% size reduction** - Typical reduction from raw .eml to clean text
+
+### Email Metadata Structure
+
+Email-specific metadata is available in `ExtractedDocument.metadata`:
+
+```python
+{
+    "extraction_method": "email_parser",
+    "email_headers": {
+        "subject": "RE: Contract Dispute",
+        "from": "legal@example.com",
+        "to": "counsel@firm.com",
+        "cc": "",
+        "date": "Wed, 07 Aug 2024 18:47:49 +0530",
+        "message_id": "<abc123@example.com>"
+    },
+    "body_format": "plain",  # or "html" or "multipart"
+    "has_attachments": true,
+    "attachment_count": 2
+}
+```
+
+### Limitations
+
+- **Attachments**: Not extracted or processed (shown as summaries only)
+- **HTML Formatting**: HTML emails lose formatting when converted to plain text
+- **Dependencies**: Uses Python stdlib only (`email.parser`, `HTMLParser`) - no new packages required
+- **Fallback**: If parsing fails, gracefully falls back to raw text reading with warning logged
+
+### Test Files
+
+Sample .eml files are available in `sample_pdf/famas_dispute/`:
+- 4 real legal correspondence emails from international arbitration case
+- Use for testing email extraction pipeline end-to-end
+
+### Implementation
+
+- **Parser Module**: `src/core/email_parser.py` (stdlib-only implementation)
+- **Integration**: `src/core/document_processor.py` routes .eml files through parser
+- **Metadata Wiring**: `src/core/docling_adapter.py` propagates email metadata to `ExtractedDocument`
+- **Test Scripts**: `scripts/test_email_parser.py`, `scripts/test_eml_integration.py`
+
+## 📷 Image File Support (JPEG/PNG)
+
+The pipeline supports **native image processing with OCR** for screenshots and scanned documents. Images are processed directly through Docling's OCR pipeline without conversion to PDF.
+
+### Supported Formats
+
+- **JPEG** (`.jpg`, `.jpeg`) - Legal document screenshots, photos of contracts
+- **PNG** (`.png`) - Screenshots, digital captures with transparency
+
+### How It Works
+
+1. **Upload Image**: JPEG or PNG file via Streamlit interface
+2. **OCR Processing**: Docling extracts text using Tesseract OCR (or configured OCR engine)
+3. **Event Extraction**: Same AI pipeline as PDFs (OpenRouter, Anthropic, etc.)
+4. **Table Output**: Standard five-column legal events table
+
+### Quality Considerations
+
+**Image Quality Matters:**
+- ✅ **High-quality screenshots**: 95%+ OCR accuracy (comparable to native PDFs)
+- ⚠️ **Phone photos**: 80-90% accuracy (lighting, angle affect OCR)
+- ❌ **Blurry/low-resolution**: <70% accuracy (may miss events)
+
+**Best Practices:**
+- Use screenshots over phone photos when possible
+- Ensure text is crisp and high-contrast
+- Minimum 1200x800 resolution recommended
+- Avoid handwritten text (OCR optimized for typed text)
+
+### Performance
+
+| Image Size | OCR Time | Total Time (w/ extraction) |
+|------------|----------|----------------------------|
+| Small (<1MB) | 5-10s | 10-20s |
+| Medium (1-3MB) | 10-20s | 20-40s |
+| Large (>3MB) | 20-40s | 40-80s |
+
+**Note:** Image OCR is slower than native PDF text extraction but comparable to scanned PDF processing.
+
+### OCR Configuration
+
+**Tesseract OCR Setup (Recommended):**
+
+Tesseract is the default OCR engine. **You must configure TESSDATA_PREFIX** for image processing to work:
+
+```bash
+# macOS (Homebrew)
+export TESSDATA_PREFIX=/usr/local/opt/tesseract/share/tessdata
+
+# Linux (apt)
+export TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
+
+# Windows
+set TESSDATA_PREFIX=C:\Program Files\Tesseract-OCR\tessdata
+
+# Add to your shell profile (~/.zshrc or ~/.bashrc) to persist
+echo 'export TESSDATA_PREFIX=/usr/local/opt/tesseract/share/tessdata' >> ~/.zshrc
+```
+
+**Verify Configuration:**
+```bash
+tesseract --version
+echo $TESSDATA_PREFIX  # Should show the path
+```
+
+**Alternative OCR Engines:**
+
+If Tesseract is not available, configure an alternative engine in `.env`:
+
+```bash
+# Use EasyOCR (no TESSDATA_PREFIX required, but slower)
+DOCLING_OCR_ENGINE=easyocr
+
+# Use OCRmac (macOS Vision Framework, fast)
+DOCLING_OCR_ENGINE=ocrmac
+
+# Use RapidOCR (lightweight)
+DOCLING_OCR_ENGINE=rapidocr
+```
+
+### Metadata
+
+Image-specific metadata in `ExtractedDocument.metadata`:
+
+```python
+{
+    "file_type": "jpg",
+    "extraction_method": "docling_image_ocr",
+    "needs_ocr": True,
+    "ocr_auto_detected": False,
+    "config": {
+        "do_ocr": True,  # Always enabled for images
+        "ocr_engine": "tesseract"  # Or configured engine
+    }
+}
+```
+
+### Limitations
+
+- **No page numbers**: Images are single-page (no PDF-style pagination)
+- **OCR-dependent**: Text must be typed (handwriting not supported)
+- **Format-specific**: TIFF, BMP, WebP, HEIC not yet supported (use JPEG/PNG)
+- **No vector graphics**: SVG, EPS need rasterization first
+- **Tesseract configuration required**: `TESSDATA_PREFIX` must be set for default OCR
+
+### Example Use Cases
+
+✅ **Legal screenshot uploads** - Court filing screenshots, email screenshots
+✅ **Contract photos** - Signed contract photos from mobile device
+✅ **Scanned single pages** - Individual page scans in JPEG format
+❌ **Handwritten notes** - OCR optimized for typed text only
+❌ **Multi-page documents** - Use PDF for multi-page files
+
+### Implementation
+
+- **Format Configuration**: `src/core/document_processor.py` configures `InputFormat.IMAGE`
+- **OCR Pipeline**: Reuses PDF OCR pipeline (Tesseract/EasyOCR/OCRmac)
+- **Image Routing**: `extract_text()` method routes JPEG/PNG through Docling
+- **Test Script**: `scripts/test_image_extraction.py`
+- **Dependencies**: Zero new dependencies (uses Docling's built-in image backend)
 
 ## 📁 Project Structure
 
@@ -650,6 +891,33 @@ See benchmark: [`docs/benchmarks/2025-10-03-ocr-engine-war.md`](docs/benchmarks/
 | `OPENCODEZEN_TIMEOUT` | `30` | Request timeout in seconds |
 
 **Note**: New extractors can be added by implementing the interfaces in `src/core/interfaces.py` and registering them in `src/core/extractor_factory.py`.
+
+## 📊 Documentation Integrity (ADICR)
+
+Run **ADICR** (Automated Documentation Integrity and Coverage Report) to detect documentation drift when providers or configuration changes:
+
+```bash
+uv run python scripts/generate_adicr_report.py --refresh
+```
+
+**What ADICR Checks:**
+- Provider parity: All providers in code appear in documentation
+- Environment variable coverage: All config vars documented in README and .env.example
+- Doc extractor options: UI options match available extractors
+
+**Outputs:**
+- **Markdown Report**: `docs/reports/adicr-latest.md` (human-readable)
+- **JSON Report**: `output/adicr/adicr_report.json` (machine-readable for CI/CD)
+
+**When to Run:**
+- After adding/removing a provider
+- Before creating documentation PRs
+- After modifying `src/core/config.py` environment variables
+- When reviewing documentation accuracy
+
+**Exit Codes:**
+- `0` - All documentation in sync or warnings only
+- `1` - Critical issues found (documentation updates needed)
 
 ---
 

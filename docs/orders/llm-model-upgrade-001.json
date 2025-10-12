@@ -1,0 +1,85 @@
+{
+  "order_id": "llm-model-upgrade-001",
+  "priority": "high",
+  "version": "v1.0",
+  "supercontext": {
+    "repository": "docling_langextract_testing",
+    "mission": "Keep the legal event extraction stack competitive by wiring in top-tier frontier models while preserving the existing multi-provider abstraction.",
+    "current_state": [
+      "Provider registry supports OpenRouter, LangExtract, OpenAI, Anthropic, DeepSeek, and OpenCode Zen, but the UI menu still highlights 2025-era defaults (Claude 3 Haiku, GPT-4o) instead of the latest flagship models.",
+      "README quick start and environment tables only document Gemini 2.0 Flash and older Anthropic/OpenAI variants.",
+      "No acceptance-level tests assert that new model identifiers propagate through ExtractorConfig, Streamlit UI state, and CLI overrides.",
+      "ADICR targets do not yet track GPT-5, Gemini 2.5 Pro, Claude 4.5, or Claude Opus, risking documentation drift once they are introduced."
+    ]
+  },
+  "goal": "Expose GPT-5, Gemini 2.5 Pro, Claude 4.5, and Claude Opus as selectable extraction models across configuration, CLI, and Streamlit UI, with documentation and tests ensuring the new options stay in sync.",
+  "execution_instructions": [
+    "Review CLAUDE.md design mantras and SECURITY.md before modifying provider adapters or introducing new environment variables.",
+    "Coordinate with maintainers if any provider requires new secrets or quota increases; do not assume keys already exist.",
+    "Work on a feature branch, capture model capability notes in docs/reports/llm-model-upgrade-001.md, and include command output for tests or manual verification.",
+    "Treat any model-specific rate or token limits as sensitive; document them in the report but keep secrets out of the repo."
+  ],
+  "tasks": [
+    {
+      "id": "provider-capability-scan",
+      "description": "Confirm availability, endpoints, and pricing for each target model before wiring them into the codebase.",
+      "steps": [
+        "Inventory which adapters (OpenAI, Anthropic via OpenRouter, direct Anthropic, LangExtract) expose tunable model IDs today.",
+        "Record the canonical model identifier, context window, output token limits, and any special parameters (json mode, reasoning toggles) for GPT-5, Gemini 2.5 Pro, Claude 4.5, and Claude Opus in docs/reports/llm-model-upgrade-001.md.",
+        "Flag provider gaps (e.g., if GPT-5 only lands via OpenRouter vs native OpenAI) so downstream tasks map the correct registry entries."
+      ]
+    },
+    {
+      "id": "config-and-registry-updates",
+      "description": "Expand configuration objects and registries so the new models can be selected via env vars and CLI.",
+      "steps": [
+        "Update `src/core/constants.py` or related config maps to include friendly labels and IDs for each new model.",
+        "Extend `ExtractorConfig` dataclasses and loader logic to accept the new model IDs without breaking existing defaults.",
+        "Add tests under `tests/` (e.g., `tests/test_extractor_factory.py`) asserting the registry returns the correct provider+model pair when environment variables specify the new options."
+      ]
+    },
+    {
+      "id": "ui-and-cli-refresh",
+      "description": "Surface the new models in user-facing entry points.",
+      "steps": [
+        "Update Streamlit UI components (`app.py` or `src/ui/streamlit_common.py`) to list the new models, including concise tooltips that describe when to choose each one.",
+        "Ensure CLI flags or prompts (e.g., `src/main.py`) accept the new identifiers and default gracefully when unset.",
+        "Verify telemetry, logging, and run summaries mention the chosen model so analysts can compare provider performance."
+      ]
+    },
+    {
+      "id": "documentation-and-adicr",
+      "description": "Document the expansion and keep ADICR from flagging drift.",
+      "steps": [
+        "Update README quick-start tables, AGENTS.md provider guidance, and `.env.example` to mention the new model environment variables or defaults.",
+        "Regenerate ADICR (`uv run python scripts/generate_adicr_report.py --refresh`) and include the resulting diff/excerpts in docs/reports/llm-model-upgrade-001.md.",
+        "Add or update a benchmark note (e.g., under `docs/benchmarks/`) summarizing why these models are now recommended, or explicitly mark benchmark gaps if data is pending."
+      ]
+    },
+    {
+      "id": "validation",
+      "description": "Prove the pipeline still runs and the new models are selectable end-to-end.",
+      "steps": [
+        "Run `uv run python tests/run_all_tests.py --quick`; if provider credentials are missing, document skips in the report.",
+        "Perform a manual dry-run via Streamlit or CLI selecting at least one of the new models (mocked or using a safe prompt) and capture screenshots or logs in the report.",
+        "Record any follow-up required (e.g., pending credentials, rate-limit coordination) under a \"Pending Items\" section."
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "All four models appear in configuration defaults, CLI help, and Streamlit selector with accurate identifiers and descriptions.",
+    "Unit or integration tests validate the registry resolves each new model without raising configuration errors.",
+    ".env.example, README.md, and AGENTS.md document the new model options and required environment variables.",
+    "docs/reports/llm-model-upgrade-001.md captures capability notes, test evidence, ADICR excerpts, and manual run logs.",
+    "ADICR passes (or documented warnings) showing documentation stays in sync after the update."
+  ],
+  "constraints": {
+    "what_not_to_do": [
+      "Do not hardcode API keys or secret tokens while testing new models; rely on environment variables only.",
+      "Do not drop existing model options or defaults unless explicitly approved; ensure backwards compatibility.",
+      "Do not merge without updated docs/tests—skipped steps must be justified in the report.",
+      "Do not expose proprietary pricing details beyond what is public; link to provider docs instead."
+    ],
+    "escalation_guidance": "If any provider lacks access to the requested model or requires contract changes, pause implementation and escalate to the project maintainer before altering defaults."
+  }
+}
