@@ -1,0 +1,297 @@
+[
+  {
+    "provider": "opencode_zen",
+    "document": "Answer to Request for Arbitration.pdf",
+    "timestamp": "2025-10-04T19:43:19.349327",
+    "success": true,
+    "error": null,
+    "timing": {
+      "document_extraction": 15.49,
+      "event_extraction": 2.01,
+      "total": 17.53
+    },
+    "cost": {},
+    "events": [
+      {
+        "number": 1,
+        "date": "Date not available",
+        "event_particulars": "Failed to extract legal events from Answer to Request for Arbitration.pdf using OpenCode Zen: OpenCode Zen API returned empty response",
+        "citation": "No citation available (extraction failed)",
+        "document_reference": "Answer to Request for Arbitration.pdf"
+      }
+    ],
+    "event_count": 1
+  },
+  {
+    "provider": "langextract",
+    "document": "Answer to Request for Arbitration.pdf",
+    "timestamp": "2025-10-04T19:43:19.344576",
+    "success": true,
+    "error": null,
+    "timing": {
+      "document_extraction": 14.04,
+      "event_extraction": 4.39,
+      "total": 18.45
+    },
+    "cost": {},
+    "events": [
+      {
+        "number": 1,
+        "date": "2020-07-01",
+        "event_particulars": "The respondent in case DIS-IHK-2025-01180 asserts that the Deutsche Institution f\u00fcr Schiedsgerichtsbarkeit e.V.(DIS) lacks jurisdiction to administer the dispute. The respondent bases this assertion on clause 6.2 of the Engagement Letter dated July 1, 2020. According to the respondent, clause 6.2 stipulates that all disputes arising from the agreement shall be settled under the Rules of the Munich Chamber of Commerce Rules of Arbitration by a single arbitrator. The respondent argues that there is no agreement to submit disputes to DIS, therefore DIS lacks jurisdiction.",
+        "citation": "",
+        "document_reference": "Unknown document"
+      },
+      {
+        "number": 2,
+        "date": "2025-05-06",
+        "event_particulars": "Elcomponics Sales Pvt. Ltd. (\"Respondent\") submitted a response to the Request for Arbitration dated 6th May 2025 filed by FAMAS Gmbh. The Respondent raised a jurisdictional objection to the arbitration request. This response was submitted on behalf of Elcomponics Sales Pvt. Ltd. by its duly authorized Company Secretary, Anu Sharma, who is authorized to represent the company in this matter. The Respondent contends that the Request for Arbitration is inadmissible and requests that DIS decline jurisdiction over the matter.",
+        "citation": "",
+        "document_reference": "Unknown document"
+      },
+      {
+        "number": 3,
+        "date": "",
+        "event_particulars": "The document references a \"request for arbitration\" between Famas GmbH and Elcomponics Sales. It mentions the absence of consent to DIS arbitration, stating that the respondent has never been asked to consent nor has consented to arbitration under DIS rules. The document also refers to arbitration rules (IHK Munchen) and notes that there is no provision in the Engagement Letter permitting submission of disputes to DIS or adoption of DIS procedural rules. This suggests a dispute regarding the applicable arbitration rules and forum.",
+        "citation": "",
+        "document_reference": "Unknown document"
+      },
+      {
+        "number": 4,
+        "date": "",
+        "event_particulars": "The Respondent contends that the Request for Arbitration is inadmissible because DIS (presumably an arbitration institution) lacks jurisdiction to administer the dispute. The Respondent argues that submitting the dispute to DIS is inconsistent with the parties' agreement and represents an attempt by the Claimant to unilaterally impose a forum not agreed upon in the Engagement Letter. Consequently, the Respondent requests that DIS decline jurisdiction over the matter. The Respondent reserves the right to submit further evidence, arguments, or documentation to support this jurisdictional objection and to engage legal counsel if necessary.",
+        "citation": "",
+        "document_reference": "Unknown document"
+      }
+    ],
+    "event_count": 4
+  },
+  {
+    "provider": "openrouter",
+    "document": "Answer to Request for Arbitration.pdf",
+    "timestamp": "2025-10-04T19:43:19.349096",
+    "success": true,
+    "error": null,
+    "timing": {
+      "document_extraction": 12.9,
+      "event_extraction": 9.09,
+      "total": 22.0
+    },
+    "cost": {},
+    "events": [
+      {
+        "number": 1,
+        "date": "18/08/2025",
+        "event_particulars": "Elcomponics Sales Pvt. Ltd. submitted a response to the Request for Arbitration filed by F AMAS GmbH, asserting that the Deutsche Institution f\u00fcr Schiedsgerichtsbarkeit e.V. (DIS) lacks jurisdiction over the dispute. The Respondent cites clause 6.2 of their Engagement Letter dated July 1, 2020, which states that all disputes shall be settled under the Rules of the Munich Chamber of Commerce by one arbitrator appointed according to those rules. The Respondent argues that there is no agreement to submit disputes to DIS, rendering the Request for Arbitration inadmissible. Furthermore, the Respondent emphasizes that they have not consented to arbitration under DIS rules, and thus, the Claimant's attempt to impose DIS as the forum is inconsistent with their agreement. The Respondent reserves the right to present further evidence or arguments in support of their jurisdictional objection.",
+        "citation": "DIS-IHK-2025-01180",
+        "document_reference": "Answer to Request for Arbitration.pdf"
+      }
+    ],
+    "event_count": 1
+  },
+  {
+    "provider": "deepseek",
+    "document": "Answer to Request for Arbitration.pdf",
+    "timestamp": "2025-10-04T19:43:41.394424",
+    "success": false,
+    "error": "DeepSeek API key is required. Set DEEPSEEK_API_KEY environment variable.",
+    "timing": {},
+    "cost": {},
+    "events": [],
+    "event_count": 0
+  },
+  {
+    "provider": "anthropic",
+    "document": "Answer to Request for Arbitration.pdf",
+    "timestamp": "2025-10-04T19:43:37.822092",
+    "success": true,
+    "error": null,
+    "timing": {
+      "document_extraction": 9.44,
+      "event_extraction": 3.43,
+      "total": 13.23
+    },
+    "cost": {},
+    "events": [
+      {
+        "number": 1,
+        "date": "1st July 2020",
+        "event_particulars": "The parties' Engagement Letter dated 1st July 2020 clause 6.2 expressly provides that 'All disputes arising in connection with this Agreement shall be finally settled under the Rules of the Munich Chamber of Commerce Rules of Arbitration (the \"Rules\") by one arbitrator appointed in accordance with said Rules.' There is no agreement to submit disputes to DIS.",
+        "citation": "Engagement Letter dated 1st July 2020, clause 6.2",
+        "document_reference": "Answer to Request for Arbitration.pdf"
+      },
+      {
+        "number": 2,
+        "date": "Date not available",
+        "event_particulars": "Respondent submits that DIS lacks jurisdiction to administer this dispute, as the parties' Engagement Letter does not permit submission of disputes to DIS or adoption of DIS procedural rules. Respondent has never consented to arbitration under DIS rules, and the Request for Arbitration is therefore inadmissible.",
+        "citation": "No citation available",
+        "document_reference": "Answer to Request for Arbitration.pdf"
+      },
+      {
+        "number": 3,
+        "date": "Date not available",
+        "event_particulars": "Respondent respectfully requests that DIS decline jurisdiction over this matter, as the dispute should be resolved under the Rules of the Munich Chamber of Commerce as specified in the parties' Engagement Letter. Respondent reserves the right to submit further evidence, arguments, or documentation in support of this jurisdictional objection, and to engage legal counsel if necessary.",
+        "citation": "No citation available",
+        "document_reference": "Answer to Request for Arbitration.pdf"
+      }
+    ],
+    "event_count": 3
+  },
+  {
+    "provider": "openai",
+    "document": "Answer to Request for Arbitration.pdf",
+    "timestamp": "2025-10-04T19:43:36.878857",
+    "success": true,
+    "error": null,
+    "timing": {
+      "document_extraction": 9.54,
+      "event_extraction": 7.61,
+      "total": 17.24
+    },
+    "cost": {
+      "total_tokens": 1638,
+      "total_cost": 0.005835,
+      "model": "gpt-4o-mini"
+    },
+    "events": [
+      {
+        "number": 1,
+        "date": "18/08/2025",
+        "event_particulars": "Elcomponics Sales Pvt. Ltd. submitted a response to the Request for Arbitration filed by F AMAS GmbH, asserting that the Deutsche Institution f\u00fcr Schiedsgerichtsbarkeit e.V. (DIS) lacks jurisdiction over the dispute. The Respondent cites clause 6.2 of their Engagement Letter dated July 1, 2020, which states that all disputes shall be settled under the Rules of the Munich Chamber of Commerce by one arbitrator appointed according to those rules. The Respondent argues that there is no agreement to submit disputes to DIS, rendering the Request for Arbitration inadmissible. Furthermore, the Respondent emphasizes that they have not consented to arbitration under DIS rules, and thus, the attempt by the Claimant to impose DIS as the forum is inconsistent with their agreement. The Respondent reserves the right to present further evidence or arguments in support of their objection.",
+        "citation": "DIS-IHK-2025-01180",
+        "document_reference": "Answer to Request for Arbitration.pdf"
+      }
+    ],
+    "event_count": 1
+  },
+  {
+    "provider": "langextract",
+    "document": "Transaction_Fee_Invoice.pdf",
+    "timestamp": "2025-10-04T19:43:56.143044",
+    "success": true,
+    "error": null,
+    "timing": {
+      "document_extraction": 11.45,
+      "event_extraction": 2.66,
+      "total": 14.11
+    },
+    "cost": {},
+    "events": [
+      {
+        "number": 1,
+        "date": "2020-07-01",
+        "event_particulars": "An engagement letter was signed on July 1, 2020. This letter outlines the terms and conditions of the business relationship between FaMAS gmbh and Elcomponics Sales Pvt Ltd. The letter includes a fee schedule, a copy of which is attached to the invoice. The transaction value is estimated at EUR 7 million for 26% of the shares of Invictus.",
+        "citation": "",
+        "document_reference": "Unknown document"
+      }
+    ],
+    "event_count": 1
+  },
+  {
+    "provider": "opencode_zen",
+    "document": "Transaction_Fee_Invoice.pdf",
+    "timestamp": "2025-10-04T19:43:56.150895",
+    "success": true,
+    "error": null,
+    "timing": {
+      "document_extraction": 12.72,
+      "event_extraction": 2.02,
+      "total": 14.75
+    },
+    "cost": {},
+    "events": [
+      {
+        "number": 1,
+        "date": "Date not available",
+        "event_particulars": "Failed to extract legal events from Transaction_Fee_Invoice.pdf using OpenCode Zen: OpenCode Zen API returned empty response",
+        "citation": "No citation available (extraction failed)",
+        "document_reference": "Transaction_Fee_Invoice.pdf"
+      }
+    ],
+    "event_count": 1
+  },
+  {
+    "provider": "openrouter",
+    "document": "Transaction_Fee_Invoice.pdf",
+    "timestamp": "2025-10-04T19:43:56.150629",
+    "success": true,
+    "error": null,
+    "timing": {
+      "document_extraction": 14.28,
+      "event_extraction": 5.52,
+      "total": 19.81
+    },
+    "cost": {},
+    "events": [
+      {
+        "number": 1,
+        "date": "2023-10-27",
+        "event_particulars": "FaMAS gmbh issued an invoice to Elcomponics Sales Pvt Ltd for a transaction fee related to an engagement letter signed on July 1, 2020. The invoice details a transaction value estimated at EUR 7 million for 26% of the shares of Invictus, with a total fee of EUR 245,000. The payment terms specified are immediate upon receipt, and the amount is net of bank charges, which must be covered by the client. Additionally, the invoice notes that VAT is subject to the importation rules of the client's country. This transaction reflects a significant financial engagement between the two companies, indicating a potential investment or acquisition.",
+        "citation": "",
+        "document_reference": "Transaction_Fee_Invoice.pdf"
+      }
+    ],
+    "event_count": 1
+  },
+  {
+    "provider": "deepseek",
+    "document": "Transaction_Fee_Invoice.pdf",
+    "timestamp": "2025-10-04T19:44:16.025810",
+    "success": false,
+    "error": "DeepSeek API key is required. Set DEEPSEEK_API_KEY environment variable.",
+    "timing": {},
+    "cost": {},
+    "events": [],
+    "event_count": 0
+  },
+  {
+    "provider": "anthropic",
+    "document": "Transaction_Fee_Invoice.pdf",
+    "timestamp": "2025-10-04T19:44:10.898372",
+    "success": true,
+    "error": null,
+    "timing": {
+      "document_extraction": 8.75,
+      "event_extraction": 1.66,
+      "total": 10.51
+    },
+    "cost": {},
+    "events": [
+      {
+        "number": 1,
+        "date": "July 1, 2020",
+        "event_particulars": "The document describes an invoice/fee for a transaction fee according to an engagement letter signed on July 1, 2020. The transaction value is estimated at EUR 7 million for 26% of the shares of Invictus. The amount of the fee is EUR 245,000.00. The payment terms are immediate on receipt and the amount is net of bank charges, which must be paid by the client.",
+        "citation": "No citation available",
+        "document_reference": "Transaction_Fee_Invoice.pdf"
+      }
+    ],
+    "event_count": 1
+  },
+  {
+    "provider": "openai",
+    "document": "Transaction_Fee_Invoice.pdf",
+    "timestamp": "2025-10-04T19:44:10.293484",
+    "success": true,
+    "error": null,
+    "timing": {
+      "document_extraction": 8.09,
+      "event_extraction": 9.78,
+      "total": 17.96
+    },
+    "cost": {
+      "total_tokens": 902,
+      "total_cost": 0.0035975,
+      "model": "gpt-4o-mini"
+    },
+    "events": [
+      {
+        "number": 1,
+        "date": "27 of October 2023",
+        "event_particulars": "FaMAS gmbh issued an invoice to Elcomponics Sales Pvt Ltd for a transaction fee related to an engagement letter signed on July 1, 2020. The invoice details a transaction value estimated at EUR 7 million for 26% of the shares of Invictus, with a total amount due of EUR 245,000. The payment terms specified are immediate upon receipt, and the amount is net of bank charges, which must be covered by the client. Additionally, the invoice notes that VAT is subject to the importation rules of the client's country. This transaction reflects a significant financial engagement between the two companies, indicating a potential investment or acquisition.",
+        "citation": "",
+        "document_reference": "Transaction_Fee_Invoice.pdf"
+      }
+    ],
+    "event_count": 1
+  }
+]

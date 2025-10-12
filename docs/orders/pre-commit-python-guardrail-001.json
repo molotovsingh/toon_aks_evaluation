@@ -1,0 +1,66 @@
+{
+  "order_id": "pre-commit-python-guardrail-001",
+  "priority": "medium",
+  "version": "v1.0",
+  "supercontext": {
+    "repository": "docling_langextract_testing",
+    "mission": "Introduce a lightweight pre-commit hook that enforces Python syntax checks and key unit tests aligned with the Docling legal-events pipeline."
+  },
+  "goal": "Create a `.git/hooks/pre-commit` script tailored to this repo’s Python tooling (uv, unittest) so contributors catch syntax errors and regressions before committing.",
+  "execution_instructions": [
+    "Review CLAUDE.md and AGENTS.md for workflow guardrails before touching hooks.",
+    "Keep the hook simple and fast (under ~5 seconds) to avoid slowing down commit cycles.",
+    "Avoid destructive Git commands (no `git stash` inside hooks). If something fails, print a clear message and exit non-zero."
+  ],
+  "tasks": [
+    {
+      "id": "design-hook",
+      "description": "Decide which checks should run on commit.",
+      "steps": [
+        "Inspect recent changes to identify critical fast tests (e.g., the classification prompt unittest).",
+        "Confirm the repo relies on `uv` for environment management and that `uv run` commands succeed locally.",
+        "Document the chosen checks in your working notes before implementation."
+      ]
+    },
+    {
+      "id": "implement-hook",
+      "description": "Create the Bash pre-commit script.",
+      "steps": [
+        "Write a shell script that collects staged Python files via `git diff --cached --name-only`.",
+        "Run `uv run python -m compileall` on any staged Python files to catch syntax errors.",
+        "Execute `uv run python -m unittest discover -s tests -p \"test_classification_prompt.py\"` to cover the new prompt helper.",
+        "Ensure the script exits with status 1 and a friendly message if any command fails."
+      ]
+    },
+    {
+      "id": "install-and-test",
+      "description": "Put the hook in place and verify it works.",
+      "steps": [
+        "Place the script at `.git/hooks/pre-commit` and set executable permissions with `chmod +x .git/hooks/pre-commit`.",
+        "Simulate a commit that stages a Python file to confirm the hook runs and blocks failures.",
+        "Document the expected hook behavior in `docs/` (e.g., append to `docs/orders/README.md` or a tooling FAQ)."
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "A new `.git/hooks/pre-commit` script exists, is executable, and enforces the agreed checks using `uv`.",
+    "The hook only inspects staged Python files and avoids modifying the working tree (no git stash).",
+    "Hook behavior is documented so contributors know what runs and how to troubleshoot failures.",
+    "`uv run python -m unittest discover -s tests -p \"test_classification_prompt.py\"` passes when invoked by the hook."
+  ],
+  "constraints": {
+    "what_not_to_do": [
+      "Do not introduce JavaScript linting or npm calls—they are irrelevant for this repo.",
+      "Do not hard-code environment paths; rely on `uv run` within the repo root.",
+      "Do not overwrite contributor-specific hooks without warning—provide the script and installation steps."
+    ],
+    "escalation_guidance": "If `uv run` fails because dependencies aren’t synced, note the exact error in the work summary and halt further changes."
+  },
+  "testing": {
+    "required_commands": [
+      "uv run python -m unittest discover -s tests -p \"test_classification_prompt.py\"",
+      "uv run python -m compileall <staged Python files> (triggered via the hook)"
+    ],
+    "notes": "Hook testing can be simulated with `SKIP=1 .git/hooks/pre-commit` or by staging a dummy Python change and running `git commit --no-verify` if you need to bypass it temporarily."
+  }
+}

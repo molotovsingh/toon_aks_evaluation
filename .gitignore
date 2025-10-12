@@ -89,3 +89,6 @@ test_excel_metadata_sheet.py
 
 # Test results directory (temporary outputs from benchmarking and OCR tests)
 test_results/
+
+# Timestamped test reports (regenerated on each run)
+tests/test_report_*.json
