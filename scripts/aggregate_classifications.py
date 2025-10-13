@@ -18,6 +18,7 @@ MODEL_DISPLAY_NAMES = {
     "openai_gpt-4o-mini": "GPT-4o-mini",
     "openai_gpt-oss-120b": "GPT-OSS-120B",
     "meta-llama_llama-3.3-70b-instruct": "Llama 3.3 70B",
+    "gpt-5": "GPT-5 (Ground Truth)",
 }
 
 
@@ -75,7 +76,7 @@ def aggregate_results() -> Tuple[Dict, List[str], List[str]]:
             results[doc_name][model_key] = classification
 
     all_documents = sorted(results.keys())
-    all_models = ["Claude 3 Haiku", "GPT-4o-mini", "GPT-OSS-120B", "Llama 3.3 70B"]  # Fixed order
+    all_models = ["Claude 3 Haiku", "GPT-4o-mini", "GPT-OSS-120B", "Llama 3.3 70B", "GPT-5 (Ground Truth)"]  # Fixed order
 
     return results, all_documents, all_models
 
@@ -142,11 +143,44 @@ def calculate_confidence_stats(results: Dict, documents: List[str], models: List
     return stats
 
 
+def calculate_ground_truth_accuracy(results: Dict, documents: List[str], models: List[str]) -> Dict:
+    """Calculate accuracy of each model against GPT-5 ground truth."""
+    ground_truth_model = "GPT-5 (Ground Truth)"
+    production_models = [m for m in models if m != ground_truth_model]
+
+    accuracy_stats = {}
+
+    for model in production_models:
+        exact_matches = 0
+        total_compared = 0
+
+        for doc in documents:
+            # Only compare if both models have classifications
+            if model in results[doc] and ground_truth_model in results[doc]:
+                gt_class = results[doc][ground_truth_model].get("primary", "N/A")
+                model_class = results[doc][model].get("primary", "N/A")
+
+                if gt_class != "N/A" and model_class != "N/A":
+                    total_compared += 1
+                    if gt_class == model_class:
+                        exact_matches += 1
+
+        if total_compared > 0:
+            accuracy_stats[model] = {
+                "exact_matches": exact_matches,
+                "total": total_compared,
+                "accuracy": exact_matches / total_compared,
+            }
+
+    return accuracy_stats
+
+
 def generate_markdown_report(results: Dict, documents: List[str], models: List[str]) -> str:
     """Generate comprehensive markdown report."""
 
     agreement = calculate_agreement(results, documents, models)
     confidence_stats = calculate_confidence_stats(results, documents, models)
+    accuracy_stats = calculate_ground_truth_accuracy(results, documents, models)
 
     report = []
 
@@ -201,21 +235,51 @@ def generate_markdown_report(results: Dict, documents: List[str], models: List[s
     # Model Comparison Table
     report.append("## Model Performance Comparison")
     report.append("")
-    report.append("| Metric | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B |")
-    report.append("|--------|----------------|-------------|--------------|---------------|")
+    report.append("| Metric | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B | GPT-5 (Ground Truth) |")
+    report.append("|--------|----------------|-------------|--------------|---------------|----------------------|")
 
     # Documents classified row
     counts = [confidence_stats.get(m, {}).get('count', 0) for m in models]
-    report.append(f"| **Documents Classified** | {counts[0]} | {counts[1]} | {counts[2]} | {counts[3]} |")
+    report.append(f"| **Documents Classified** | {counts[0]} | {counts[1]} | {counts[2]} | {counts[3]} | {counts[4]} |")
 
-    report.append(f"| **Pricing** | $0.25/M | $0.15/M | $0.31/M | $0.60/M |")
-    report.append(f"| **License** | Proprietary | Proprietary | Apache 2.0 (OSS) | Meta Llama (OSS) |")
+    report.append(f"| **Pricing** | $0.25/M | $0.15/M | $0.31/M | $0.60/M | TBD |")
+    report.append(f"| **License** | Proprietary | Proprietary | Apache 2.0 (OSS) | Meta Llama (OSS) | Proprietary |")
 
     # Mean confidence row
     confs = [confidence_stats.get(m, {}).get('mean', 0) for m in models]
-    report.append(f"| **Mean Confidence** | {confs[0]:.2f} | {confs[1]:.2f} | {confs[2]:.2f} | {confs[3]:.2f} |")
+    report.append(f"| **Mean Confidence** | {confs[0]:.2f} | {confs[1]:.2f} | {confs[2]:.2f} | {confs[3]:.2f} | {confs[4]:.2f} |")
 
     report.append("")
+    report.append("---")
+    report.append("")
+
+    # Ground Truth Accuracy (GPT-5 as baseline)
+    report.append("## Ground Truth Accuracy")
+    report.append("")
+    report.append("**GPT-5 as Reference Standard**: We use GPT-5 classifications as ground truth to measure production model accuracy.")
+    report.append("")
+
+    if accuracy_stats:
+        # Sort models by accuracy (descending)
+        sorted_models = sorted(accuracy_stats.items(), key=lambda x: x[1]['accuracy'], reverse=True)
+
+        report.append("| Model | Exact Matches | Total Compared | Accuracy |")
+        report.append("|-------|---------------|----------------|----------|")
+
+        for model, stats in sorted_models:
+            accuracy_pct = stats['accuracy'] * 100
+            report.append(f"| **{model}** | {stats['exact_matches']}/{stats['total']} | {stats['total']} | {accuracy_pct:.1f}% |")
+
+        report.append("")
+
+        # Find best model
+        best_model, best_stats = sorted_models[0]
+        report.append(f"**Key Finding**: {best_model} achieved the highest accuracy ({best_stats['accuracy']:.1%}) against GPT-5 ground truth.")
+        report.append("")
+    else:
+        report.append("No ground truth comparisons available.")
+        report.append("")
+
     report.append("---")
     report.append("")
 
@@ -334,8 +398,8 @@ def generate_markdown_report(results: Dict, documents: List[str], models: List[s
     # Appendix: Full Classification Matrix
     report.append("## Appendix: Full Classification Matrix")
     report.append("")
-    report.append("| Document | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B |")
-    report.append("|----------|----------------|-------------|--------------|---------------|")
+    report.append("| Document | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B | GPT-5 (Ground Truth) |")
+    report.append("|----------|----------------|-------------|--------------|---------------|----------------------|")
 
     for doc in documents:
         row = [f"{doc[:50]}..." if len(doc) > 50 else doc]

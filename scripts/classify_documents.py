@@ -53,6 +53,7 @@ DEFAULT_DEMO_FILES: List[Path] = [
 ]
 
 DEFAULT_MODEL = "anthropic/claude-3-haiku"
+DEFAULT_PROVIDER = "openrouter"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
@@ -80,9 +81,15 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         help="Glob pattern to select files (evaluated relative to project root).",
     )
     parser.add_argument(
+        "--provider",
+        default=DEFAULT_PROVIDER,
+        choices=["openrouter", "openai"],
+        help=f"API provider to use (default: {DEFAULT_PROVIDER}). 'openrouter' uses OpenRouter API, 'openai' uses direct OpenAI API.",
+    )
+    parser.add_argument(
         "--model",
         default=DEFAULT_MODEL,
-        help=f"Hosted model identifier (default: {DEFAULT_MODEL}).",
+        help=f"Model identifier (default: {DEFAULT_MODEL}).",
     )
     parser.add_argument(
         "--base-url",
@@ -190,7 +197,7 @@ def call_model(
     base_url: str,
     temperature: float,
     timeout: float,
-) -> tuple[dict, float]:
+) -> tuple[dict, str, float]:
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not set. Export it to make real API calls.")
@@ -221,6 +228,84 @@ def call_model(
     return parsed, choice, float(latency or 0.0)
 
 
+def call_openai_direct(
+    system_message: str,
+    user_message: str,
+    *,
+    model: str,
+    temperature: float,
+    timeout: float,
+) -> tuple[dict, str, float]:
+    """
+    Call OpenAI API directly using openai SDK
+
+    This function provides direct OpenAI API access for ground truth model classification
+    (e.g., GPT-5). Uses the same interface as call_model() for compatibility.
+    """
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set. Export it to make real API calls with provider=openai.")
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise RuntimeError("openai library not installed. Run: uv pip install openai")
+
+    client = OpenAI(api_key=api_key, timeout=timeout)
+
+    # Check if model is GPT-5 (requires different API parameters)
+    is_gpt5 = "gpt-5" in model.lower()
+    uses_responses_api = is_gpt5  # GPT-5 uses Responses API for reasoning
+
+    try:
+        if uses_responses_api:
+            # GPT-5: Use Responses API for advanced reasoning
+            input_text = f"{system_message}\n\n{user_message}"
+            response = client.responses.create(
+                model=model,
+                input=input_text,
+                reasoning={"effort": "medium"},
+                text={"verbosity": "medium"},
+            )
+            content = response.output_text
+            latency = 0.0  # Responses API doesn't provide latency
+        else:
+            # GPT-4: Use Chat Completions API
+            kwargs = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": user_message}
+                ],
+                "temperature": 1.0 if is_gpt5 else temperature,
+            }
+
+            # Add max tokens parameter
+            if is_gpt5:
+                kwargs["max_completion_tokens"] = 4096
+            else:
+                kwargs["max_tokens"] = 4096
+
+            # Check if model supports JSON mode
+            supports_json_mode = any(
+                compatible in model.lower()
+                for compatible in ["gpt-5", "gpt-4o", "gpt-4-turbo"]
+            )
+            if supports_json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+
+            response = client.chat.completions.create(**kwargs)
+            content = response.choices[0].message.content
+            latency = 0.0  # Chat Completions API doesn't provide latency
+
+        # Parse the response
+        parsed = parse_model_json(content)
+        return parsed, content, latency
+
+    except Exception as e:
+        raise RuntimeError(f"OpenAI API call failed: {e}") from e
+
+
 def run_classification(args: argparse.Namespace) -> List[ClassificationResult]:
     load_dotenv()
     docling_config, _, _ = load_config()
@@ -236,14 +321,24 @@ def run_classification(args: argparse.Namespace) -> List[ClassificationResult]:
         prompt = build_classification_prompt(path.name, excerpt, prompt_version=args.prompt_version)
 
         if args.execute:
-            response, raw_response, latency = call_model(
-                prompt.system_message,
-                prompt.user_message,
-                model=args.model,
-                base_url=args.base_url,
-                temperature=args.temperature,
-                timeout=args.timeout,
-            )
+            # Route to appropriate API based on provider
+            if args.provider == "openai":
+                response, raw_response, latency = call_openai_direct(
+                    prompt.system_message,
+                    prompt.user_message,
+                    model=args.model,
+                    temperature=args.temperature,
+                    timeout=args.timeout,
+                )
+            else:  # openrouter
+                response, raw_response, latency = call_model(
+                    prompt.system_message,
+                    prompt.user_message,
+                    model=args.model,
+                    base_url=args.base_url,
+                    temperature=args.temperature,
+                    timeout=args.timeout,
+                )
         else:
             response = {
                 "classes": ["DRY_RUN"],
