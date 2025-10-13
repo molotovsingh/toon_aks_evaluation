@@ -7,6 +7,8 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 
+from openai import OpenAI
+
 from .interfaces import EventExtractor, EventRecord
 from .config import OpenRouterConfig
 from .constants import DEFAULT_NO_DATE, DEFAULT_NO_CITATION, LEGAL_EVENTS_PROMPT
@@ -47,7 +49,7 @@ class OpenRouterEventExtractor:
         from .extractor_factory import ExtractorConfigurationError
 
         self.config = config
-        self._http = None
+        self._client = None
 
         # Validate API key at initialization
         if not config.api_key or config.api_key.strip() == "":
@@ -63,10 +65,13 @@ class OpenRouterEventExtractor:
                 f"This is normal for many OSS models."
             )
 
-        # Lazy import HTTP client
+        # Initialize OpenAI SDK client (pointed at OpenRouter base_url)
         try:
-            import requests
-            self._http = requests
+            self._client = OpenAI(
+                base_url=config.base_url,
+                api_key=config.api_key,
+                timeout=config.timeout
+            )
             self.available = True
 
             # Log which model is being used (runtime override or env default)
@@ -75,8 +80,8 @@ class OpenRouterEventExtractor:
                 logger.info(f"✅ OpenRouterEventExtractor initialized with runtime model: {active_model} (overriding env default: {config.model})")
             else:
                 logger.info(f"✅ OpenRouterEventExtractor initialized with model: {active_model}")
-        except ImportError:
-            logger.warning("⚠️ requests library not available - OpenRouter adapter will be disabled")
+        except Exception as e:
+            logger.warning(f"⚠️ OpenAI SDK not available - OpenRouter adapter will be disabled: {e}")
             self.available = False
 
     def _check_json_mode_support(self, model: str) -> bool:
@@ -117,7 +122,7 @@ class OpenRouterEventExtractor:
             return [self._create_fallback_record(document_name, "No text content to process")]
 
         try:
-            # Call OpenRouter API
+            # Call OpenRouter Chat Completions API
             response_data = self._call_openrouter_api(text)
 
             if not response_data:
@@ -140,7 +145,7 @@ class OpenRouterEventExtractor:
 
     def _call_openrouter_api(self, text: str) -> Optional[Dict[str, Any]]:
         """
-        Make API call to OpenRouter
+        Make API call to OpenRouter using OpenAI SDK
 
         Args:
             text: Document text to process
@@ -148,13 +153,6 @@ class OpenRouterEventExtractor:
         Returns:
             API response data or None on failure
         """
-        url = f"{self.config.base_url}/chat/completions"
-
-        headers = {
-            "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json"
-        }
-
         # Construct messages with legal events extraction prompt
         messages = [
             {
@@ -167,32 +165,39 @@ class OpenRouterEventExtractor:
             }
         ]
 
-        payload = {
-            "model": self.config.active_model,  # Use active_model (runtime override or env default)
-            "messages": messages,
-            "temperature": 0.0,
-        }
-
-        # Only add response_format if model supports it (otherwise rely on prompt-based JSON)
-        if self._supports_json_mode:
-            payload["response_format"] = {"type": "json_object"}
-
         try:
-            response = self._http.post(
-                url,
-                headers=headers,
-                json=payload,
-                timeout=self.config.timeout
-            )
+            # Build request parameters
+            params = {
+                "model": self.config.active_model,  # Use active_model (runtime override or env default)
+                "messages": messages,
+                "temperature": 0.0,
+            }
 
-            response.raise_for_status()
-            return response.json()
+            # Only add response_format if model supports it (otherwise rely on prompt-based JSON)
+            if self._supports_json_mode:
+                params["response_format"] = {"type": "json_object"}
 
-        except self._http.exceptions.RequestException as e:
+            # OpenAI SDK handles retries, connection pooling, error handling
+            response = self._client.chat.completions.create(**params)
+
+            # Convert SDK response to dict format (same structure as before for compatibility)
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": response.choices[0].message.content
+                        }
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens
+                }
+            }
+
+        except Exception as e:
             logger.error(f"❌ OpenRouter API request failed: {e}")
-            return None
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ Failed to parse OpenRouter API response: {e}")
             return None
 
     def _parse_openrouter_response(self, response_data: Dict[str, Any], document_name: str) -> List[EventRecord]:
@@ -317,7 +322,7 @@ class OpenRouterEventExtractor:
         """
         return (
             self.available and
-            self._http is not None and
+            self._client is not None and
             self.config.api_key and
             self.config.api_key.strip() != ""
         )
