@@ -13,7 +13,7 @@
 ## Order Index - Complete Status
 
 **Last Updated**: 2025-10-13
-**Total Orders**: 16 (1 template + 2 completed + 6 active + 3 planning + 3 needs investigation + 1 superseded)
+**Total Orders**: 16 (1 template + 4 completed + 5 active + 3 planning + 2 needs investigation + 1 superseded)
 
 ### Status Legend
 - 📋 **Template** - Reference blueprint for creating new orders
@@ -34,16 +34,18 @@
 
 ---
 
-### ✅ Completed Orders (2)
+### ✅ Completed Orders (4)
 
 | Order ID | Priority | Version | Completion Evidence | Description | Links |
 |----------|----------|---------|---------------------|-------------|-------|
 | **llm-model-upgrade-001** | High | v1.0 | 2025-10-11 | Expose GPT-5, Gemini 2.5 Pro, Claude 4.5/Opus as selectable models | [📄](llm-model-upgrade-001.json) · [✅ Report](../reports/llm-model-upgrade-002-completion.md) |
-| **pre-commit-python-guardrail-001** | Medium | v1.0 | 2025-10-XX | Pre-commit hook for Python syntax checks and fast tests | [📄](pre-commit-python-guardrail-001.json) · [✅ Hook](../../hooks/pre-commit) |
+| **pre-commit-python-guardrail-001** | Medium | v1.0 | 2025-10-11 | Pre-commit hook for Python syntax checks and fast tests | [📄](pre-commit-python-guardrail-001.json) · [✅ Hook](../../hooks/pre-commit) |
+| **eml-normalization-001** | High | v1.0 | 2025-10-10 | Normalize .eml ingestion for clean email text extraction | [📄](eml-normalization-001.json) · [✅ Report](../reports/eml-normalization-001-completion.md) |
+| **order-index-001** | Medium | v1.0 | 2025-10-13 | Create comprehensive order status index with 100% visibility | [📄](order-index-001.json) · [✅ Commit](../../commit/fe65ee4) |
 
 ---
 
-### 🔄 Active Orders (6)
+### 🔄 Active Orders (5)
 
 | Order ID | Priority | Version | Description | Links |
 |----------|----------|---------|-------------|-------|
@@ -52,7 +54,6 @@
 | **git-housekeeping-001-triage** | Medium | v1.0 | Phase 1: Read-only repository triage (file categorization, .gitignore gaps) | [📄](git-housekeeping-001-triage.json) |
 | **git-housekeeping-001-execute** | Medium | v1.0 | Phase 2: Execute housekeeping (harden .gitignore, prune refs, cleanup) — **Requires clean baseline** | [📄](git-housekeeping-001-execute.json) |
 | **order-archival-001** | Medium | v1.0 | Automate archival workflow for completed orders | [📄](order-archival-001.json) |
-| **order-index-001** | Medium | v1.0 | **THIS ORDER** - Create comprehensive order status index | [📄](order-index-001.json) |
 
 ---
 
@@ -66,13 +67,12 @@
 
 ---
 
-### ⚠️ Needs Investigation (3)
+### ⚠️ Needs Investigation (2)
 
 | Order ID | Priority | Version | Status Notes | Description | Links |
 |----------|----------|---------|--------------|-------------|-------|
 | **event-extractor-001** | High | v1.0 | No completion evidence found | Enable configurable event extractor providers (LangExtract, OpenRouter, OpenCode Zen) | [📄](event-extractor-001.json) |
 | **doc-parsing-fastpath-001** | High | v1.0 | No completion evidence found | PyMuPDF fast path for digital PDFs + ocrmypdf pre-OCR for scanned PDFs | [📄](doc-parsing-fastpath-001.json) |
-| **eml-normalization-001** | High | v1.0 | Has completion report, needs status verification | Normalize .eml ingestion for clean email text extraction | [📄](eml-normalization-001.json) · [📋 Report](../reports/eml-normalization-001-completion.md) |
 
 ---
 
