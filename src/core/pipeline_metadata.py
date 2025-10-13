@@ -180,18 +180,35 @@ class PipelineMetadata:
         # Provider info
         provider_name = getattr(pipeline, 'provider', 'langextract')
 
-        # Provider model - extract from adapter with fallbacks
+        # Provider model - extract from adapter with proper config access
+        # This supports runtime model overrides (UI selections) over environment defaults
         provider_model = None
         try:
-            # Try adapter properties first
             if hasattr(pipeline, 'event_extractor'):
                 extractor = pipeline.event_extractor
-                if hasattr(extractor, 'model_id'):
+
+                # Strategy 1: config.active_model (OpenRouter pattern with runtime override support)
+                # OpenRouter uses a @property that returns runtime_model if set, else env default
+                if hasattr(extractor, 'config') and hasattr(extractor.config, 'active_model'):
+                    provider_model = extractor.config.active_model
+
+                # Strategy 2: config.model (OpenAI/Anthropic/DeepSeek pattern)
+                # These providers store the model in config.model (includes runtime overrides)
+                elif hasattr(extractor, 'config') and hasattr(extractor.config, 'model'):
+                    provider_model = extractor.config.model
+
+                # Strategy 3: config.model_id (LangExtract/Gemini pattern)
+                # LangExtract uses model_id instead of model for Gemini model identifiers
+                elif hasattr(extractor, 'config') and hasattr(extractor.config, 'model_id'):
+                    provider_model = extractor.config.model_id
+
+                # Fallback: Try direct properties (backward compatibility for old adapters)
+                elif hasattr(extractor, 'model_id'):
                     provider_model = extractor.model_id
                 elif hasattr(extractor, 'model'):
                     provider_model = extractor.model
 
-            # Fallback to environment variables
+            # Final fallback to environment variables (only if no adapter config found)
             if not provider_model:
                 if provider_name == 'openrouter':
                     provider_model = os.getenv('OPENROUTER_MODEL', 'openai/gpt-4o-mini')
