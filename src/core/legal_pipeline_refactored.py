@@ -279,10 +279,12 @@ class LegalEventsPipeline:
                 metadata.status = 'success'
 
                 # Extract timing metrics if available (from per-record timing)
-                if 'Docling_Seconds' in df.columns:
-                    metadata.docling_seconds = df['Docling_Seconds'].sum()
-                if 'Extractor_Seconds' in df.columns:
-                    metadata.extractor_seconds = df['Extractor_Seconds'].sum()
+                # Note: Timing values are the same for all events from a single document,
+                # so we take the first value instead of summing (which would multiply by event count)
+                if 'Docling_Seconds' in df.columns and len(df) > 0:
+                    metadata.docling_seconds = df['Docling_Seconds'].iloc[0]
+                if 'Extractor_Seconds' in df.columns and len(df) > 0:
+                    metadata.extractor_seconds = df['Extractor_Seconds'].iloc[0]
 
             # Attach metadata to DataFrame (accessible for export and saving)
             df.attrs['pipeline_id'] = metadata.run_id
