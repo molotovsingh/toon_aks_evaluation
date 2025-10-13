@@ -10,19 +10,105 @@
 
 ---
 
-## Current Active Orders
+## Order Index - Complete Status
 
-| Order ID | Priority | Status | Purpose |
-|----------|----------|--------|---------|
-| **example-order-template.json** | Reference | Template | Blueprint for new development orders |
-| **git-housekeeping-001-triage.json** | Medium | Active | Phase 1: Read-only repository triage (file categorization, .gitignore gaps) |
-| **git-housekeeping-001-execute.json** | Medium | Active | Phase 2: Execute housekeeping (harden .gitignore, prune refs, cleanup) |
-| **git-housekeeping-001.json** | Medium | SUPERSEDED | Original single-phase housekeeping (replaced by triage+execute) |
-| **order-archival-001.json** | Medium | In Progress | Automate archival of completed orders |
-| **orders-readme-001.json** | Low | Active | Create README guidance for orders directories |
-| **event-extractor-001.json** | - | Needs Investigation | Unclear completion status |
-| **doc-parsing-fastpath-001.json** | - | Needs Investigation | Unclear completion status |
-| **eml-normalization-001.json** | - | Needs Investigation | Email format standardization |
+**Last Updated**: 2025-10-13
+**Total Orders**: 16 (1 template + 2 completed + 6 active + 3 planning + 3 needs investigation + 1 superseded)
+
+### Status Legend
+- 📋 **Template** - Reference blueprint for creating new orders
+- ✅ **Completed** - All acceptance criteria met, has completion evidence
+- 🔄 **Active** - Currently being executed or ready for execution
+- 📝 **Planning** - Design/architecture phase, not yet implementing
+- ⏸️ **Pending** - Waiting for prerequisites to be met
+- ⚠️ **Needs Investigation** - Status unclear, requires evidence review
+- 🔁 **Superseded** - Replaced by revised version
+
+---
+
+### 📋 Templates (1)
+
+| Order ID | Version | Description | Link |
+|----------|---------|-------------|------|
+| **example-order-template** | - | Blueprint for new development orders | [📄](example-order-template.json) |
+
+---
+
+### ✅ Completed Orders (2)
+
+| Order ID | Priority | Version | Completion Evidence | Description | Links |
+|----------|----------|---------|---------------------|-------------|-------|
+| **llm-model-upgrade-001** | High | v1.0 | 2025-10-11 | Expose GPT-5, Gemini 2.5 Pro, Claude 4.5/Opus as selectable models | [📄](llm-model-upgrade-001.json) · [✅ Report](../reports/llm-model-upgrade-002-completion.md) |
+| **pre-commit-python-guardrail-001** | Medium | v1.0 | 2025-10-XX | Pre-commit hook for Python syntax checks and fast tests | [📄](pre-commit-python-guardrail-001.json) · [✅ Hook](../../hooks/pre-commit) |
+
+---
+
+### 🔄 Active Orders (6)
+
+| Order ID | Priority | Version | Description | Links |
+|----------|----------|---------|-------------|-------|
+| **doc-classification-claude-001** | High | v1.0 | Benchmark small models (Claude Haiku, GPT-4o-mini) for document classification | [📄](doc-classification-claude-001.json) |
+| **openrouter-gpt5-ux-001** | Medium | v1.0 | Add GPT-5 to OpenRouter model selector UI | [📄](openrouter-gpt5-ux-001.json) |
+| **git-housekeeping-001-triage** | Medium | v1.0 | Phase 1: Read-only repository triage (file categorization, .gitignore gaps) | [📄](git-housekeeping-001-triage.json) |
+| **git-housekeeping-001-execute** | Medium | v1.0 | Phase 2: Execute housekeeping (harden .gitignore, prune refs, cleanup) — **Requires clean baseline** | [📄](git-housekeeping-001-execute.json) |
+| **order-archival-001** | Medium | v1.0 | Automate archival workflow for completed orders | [📄](order-archival-001.json) |
+| **order-index-001** | Medium | v1.0 | **THIS ORDER** - Create comprehensive order status index | [📄](order-index-001.json) |
+
+---
+
+### 📝 Planning Orders (3)
+
+| Order ID | Priority | Version | Description | Links |
+|----------|----------|---------|-------------|-------|
+| **model-catalog-v2-architecture-001** | High | v2.0 | Design centralized model registry with metadata propagation | [📄](model-catalog-v2-architecture-001.json) |
+| **duckdb-ingestion-001** | Medium | v1.0 | Create DuckDB database for pipeline metadata with ingestion script | [📄](duckdb-ingestion-001.json) |
+| **release-notes-and-versioning-001** | Medium | v1.1 | Document recent changes, bump version, prepare git tag | [📄](release-notes-and-versioning-001.json) |
+
+---
+
+### ⚠️ Needs Investigation (3)
+
+| Order ID | Priority | Version | Status Notes | Description | Links |
+|----------|----------|---------|--------------|-------------|-------|
+| **event-extractor-001** | High | v1.0 | No completion evidence found | Enable configurable event extractor providers (LangExtract, OpenRouter, OpenCode Zen) | [📄](event-extractor-001.json) |
+| **doc-parsing-fastpath-001** | High | v1.0 | No completion evidence found | PyMuPDF fast path for digital PDFs + ocrmypdf pre-OCR for scanned PDFs | [📄](doc-parsing-fastpath-001.json) |
+| **eml-normalization-001** | High | v1.0 | Has completion report, needs status verification | Normalize .eml ingestion for clean email text extraction | [📄](eml-normalization-001.json) · [📋 Report](../reports/eml-normalization-001-completion.md) |
+
+---
+
+### 🔁 Superseded Orders (1)
+
+| Order ID | Version | Superseded Date | Replaced By | Links |
+|----------|---------|-----------------|-------------|-------|
+| **git-housekeeping-001** | v1.0 | 2025-10-11 | git-housekeeping-001-triage.json + git-housekeeping-001-execute.json | [📄](git-housekeeping-001.json) |
+
+---
+
+## How to Use This Index
+
+### Quick Navigation
+- **Finding active work**: Check 🔄 Active Orders section
+- **Understanding what's complete**: Check ✅ Completed Orders with completion evidence links
+- **Planning future work**: Check 📝 Planning Orders for design documents
+- **Investigating unclear orders**: Check ⚠️ Needs Investigation section
+
+### Updating This Index
+This index should be updated when:
+1. **New order created**: Add to appropriate status section (usually 🔄 Active or 📝 Planning)
+2. **Order completed**: Move from Active → Completed, add completion evidence link
+3. **Order superseded**: Move to 🔁 Superseded section, note replacement order
+4. **Status changes**: Update status emoji and section (e.g., Planning → Active)
+
+**Update frequency**: After every order creation, completion, or status change
+
+### Status Transition Flow
+```
+📝 Planning → 🔄 Active → ✅ Completed → [Archive]
+                ↓
+         🔁 Superseded → [Archive]
+                ↓
+         ⚠️ Needs Investigation → [Resolve status] → [Appropriate section]
+```
 
 ---
 
@@ -305,5 +391,5 @@ rm docs/orders/completed-order.json
 
 ---
 
-*Last Updated: 2025-10-11*
-*Next Audit Recommended: 2025-11-11 (monthly cadence)*
+*Last Updated: 2025-10-13 (Order Index Update)*
+*Next Audit Recommended: 2025-11-13 (monthly cadence)*
