@@ -119,6 +119,18 @@ div[data-testid="column"]:nth-child(2) button[kind="primary"]:hover {
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5) !important;
 }
 
+/* OpenAI specific styling (third column) */
+div[data-testid="column"]:nth-child(3) button[kind="primary"] {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
+    border-color: #6d28d9 !important;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4) !important;
+}
+
+div[data-testid="column"]:nth-child(3) button[kind="primary"]:hover {
+    background: linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%) !important;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.5) !important;
+}
+
 /* === STATUS BADGES === */
 .status-pill {
     display: inline-flex;
@@ -482,6 +494,8 @@ MODEL_CATALOG = [
                 "Open Source", "$0.60/M", "128K", "10/10", ["OSS"]),
     ModelConfig("openrouter", "mistralai/mistral-small", "Mistral Small",
                 "Open Source", "$0.20/M", "128K", "10/10", ["EU compliance"]),
+    ModelConfig("openrouter", "openai/gpt-oss-120b", "GPT-OSS 120B",
+                "Open Source", "$0.31/M", "128K", "10/10", ["Apache 2.0", "Self-hostable"]),
 
     # === DEEPSEEK ===
     ModelConfig("deepseek", "deepseek-chat", "DeepSeek Chat",
@@ -889,6 +903,7 @@ def create_openrouter_model_selector():
         "🌍 Open Source / EU Hosting": [
             ("meta-llama/llama-3.3-70b-instruct", "Llama 3.3 70B", "$0.60/M • 128K", "10/10 • OSS"),
             ("mistralai/mistral-small", "Mistral Small", "$0.20/M • 128K", "10/10 • EU compliance"),
+            ("openai/gpt-oss-120b", "GPT-OSS 120B", "$0.31/M • 128K", "10/10 • Self-hostable"),
         ]
     }
 
@@ -970,6 +985,7 @@ def create_openrouter_model_selector():
         - **50+ page contracts?** → Use **Claude 3.5 Sonnet** or **Claude 3 Haiku** (200K context window)
         - **Need results in 5 seconds?** → Use **Claude 3 Haiku** (4.4s extraction time)
         - **EU data compliance?** → Use **Mistral Small** (EU-hosted model)
+        - **Privacy/sovereignty concerns?** → Use **GPT-OSS 120B** (Apache 2.0, can self-host if needed)
 
         **Key Metrics**:
         - **Quality scores** (10/10, 9/10, 7/10): From Oct 2025 JSON mode + legal extraction tests
@@ -1047,8 +1063,8 @@ def create_provider_selection():
     if 'selected_provider' not in st.session_state:
         st.session_state.selected_provider = default_provider
 
-    # === PRIMARY: Two main providers side-by-side ===
-    col1, col2 = st.columns(2)
+    # === PRIMARY: Three main providers side-by-side ===
+    col1, col2, col3 = st.columns(3)
 
     # Column 1: OpenRouter
     with col1:
@@ -1096,6 +1112,29 @@ def create_provider_selection():
         else:
             st.markdown('<span class="status-pill setup">⚠ Setup Required</span>', unsafe_allow_html=True)
 
+    # Column 3: OpenAI
+    with col3:
+        openai_configured = check_provider_status('openai')
+        is_openai_selected = st.session_state.selected_provider == 'openai'
+
+        if st.button(
+            "🧠 OpenAI",
+            key="provider_openai",
+            use_container_width=True,
+            type="primary" if is_openai_selected else "secondary"
+        ):
+            if st.session_state.selected_provider != 'openai':
+                st.session_state.selected_provider = 'openai'
+                if 'legal_events_df' in st.session_state:
+                    del st.session_state.legal_events_df
+                st.rerun()
+
+        st.caption("GPT-5 • GPT-4o")
+        if openai_configured:
+            st.markdown('<span class="status-pill ready">✓ Ready</span>', unsafe_allow_html=True)
+        else:
+            st.markdown('<span class="status-pill setup">⚠ Setup Required</span>', unsafe_allow_html=True)
+
     # Show model selector if OpenRouter is selected
     if is_openrouter_selected:
         if openrouter_configured:
@@ -1116,15 +1155,24 @@ def create_provider_selection():
             st.info("💡 **Setup**: Add `GEMINI_API_KEY` to your `.env` file, then restart.\n\nGet free API key: https://aistudio.google.com/app/apikey")
             return 'langextract', None
 
+    # Show model selector if OpenAI is selected
+    if is_openai_selected:
+        if openai_configured:
+            st.markdown("")  # Spacing
+            selected_model = create_unified_model_selector('openai')
+            return 'openai', selected_model
+        else:
+            st.info("💡 **Setup**: Add `OPENAI_API_KEY` to your `.env` file, then restart.\n\nGet API key: https://platform.openai.com/api-keys")
+            return 'openai', None
+
     st.divider()
 
     # === SECONDARY: Direct Provider APIs (Advanced) ===
     with st.expander("🔧 Direct Provider APIs (Advanced)", expanded=False):
         st.caption("Enterprise-grade providers with direct API access")
 
-        # Direct provider options (without LangExtract - now in primary section)
+        # Direct provider options (OpenAI now in primary section)
         direct_providers = {
-            'openai': ('🧠 OpenAI', 'GPT-4o / 4o-mini', '$0.15-$3/M', 'OPENAI_API_KEY'),
             'anthropic': ('🎯 Anthropic', 'Claude 3.5', 'Premium', 'ANTHROPIC_API_KEY'),
             'deepseek': ('🔍 DeepSeek', 'DeepSeek R1', 'Budget', 'DEEPSEEK_API_KEY'),
             'opencode_zen': ('⚖️ OpenCode Zen', 'Legal AI', 'Premium', 'OPENCODEZEN_API_KEY'),
@@ -1159,9 +1207,6 @@ def create_provider_selection():
     if selected_provider == 'anthropic' and check_provider_status('anthropic'):
         st.markdown("")  # Spacing
         return 'anthropic', create_unified_model_selector('anthropic')
-    elif selected_provider == 'openai' and check_provider_status('openai'):
-        st.markdown("")  # Spacing
-        return 'openai', create_unified_model_selector('openai')
     elif selected_provider == 'deepseek' and check_provider_status('deepseek'):
         st.markdown("")  # Spacing
         return 'deepseek', create_unified_model_selector('deepseek')

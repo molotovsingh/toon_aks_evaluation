@@ -20,7 +20,7 @@ This is a **proof-of-concept testing environment** for evaluating combinations o
 
 **Event Extractors Supported**:
 - **LangExtract** (Gemini) - Default, uses Google's Gemini 2.0 Flash
-- **OpenRouter** (Unified API) - 9 curated models from OpenAI, Anthropic, DeepSeek, Meta, Mistral (Oct 2025 testing)
+- **OpenRouter** (Unified API) - 10 curated models from OpenAI, Anthropic, DeepSeek, Meta, Mistral (Oct 2025 testing)
 - **OpenCode Zen** (Legal AI) - Specialized legal extraction models
 - **OpenAI** (Direct API) - GPT-4o, GPT-4o-mini via OpenAI SDK
 - **Anthropic** (Direct API) - Claude 3.5 Sonnet, Claude 3 Haiku via Anthropic SDK
@@ -235,8 +235,14 @@ USE_ENHANCED_PROMPT=true uv run python scripts/test_openrouter.py
 - **Speed champion**: `anthropic/claude-3-haiku` ($0.25/M, 10/10 quality, 200K, 4.4s extraction)
 - **Long documents (50+ pages)**: `anthropic/claude-3-5-sonnet` ($3/M, 10/10 quality, 200K context)
 - **Open source option**: `meta-llama/llama-3.3-70b-instruct` ($0.60/M, 10/10 quality, 128K)
+- **Privacy/sovereignty hedge**: `openai/gpt-oss-120b` ($0.31/M, 10/10 quality, 128K, Apache 2.0 licensed)
+  - Strategic value: Insurance policy against vendor lock-in and future privacy requirements
+  - Can self-host if privacy/sovereignty concerns emerge (unlike proprietary APIs)
+  - Not dependent on Chinese AI (DeepSeek) or changing US corporate policies (OpenAI)
+  - Cost: $0.28/M premium over DeepSeek for control and optionality
+  - Use case: Production systems that may need private deployment in future
 
-Total: 10 battle-tested models (9-10/10 quality, plus 1 budget option at 7/10). **Excluded**: All Gemini variants, Cohere, Perplexity (failed JSON mode tests).
+Total: 11 battle-tested models (9-10/10 quality, plus 1 budget option at 7/10). **Excluded**: All Gemini variants, Cohere, Perplexity (failed JSON mode tests).
 
 **Oct 5, 2025 Adapter Fix** - Conditional JSON Mode Support:
 - Fixed OpenRouter adapter to support prompt-based JSON (not just native `response_format`)
@@ -244,8 +250,16 @@ Total: 10 battle-tested models (9-10/10 quality, plus 1 budget option at 7/10). 
 - Result: Qwen QwQ 32B now works (7/10 quality, ultra-cheap at $0.115/M)
 
 **Additional exclusions** (Oct 5, 2025 OSS model testing):
-- GPT-OSS 20B/120B: Return empty responses (1/10 quality, fundamentally broken)
 - Mistral Small 3.1: Weak real-doc extraction (7/10 quality, extracted 1 event vs ≥3 expected)
+
+**Oct 13, 2025 DISCOVERY - GPT-OSS-120B WORKS**:
+- ✅ **openai/gpt-oss-120b** passes all tests (10/10 quality, prompt-based JSON)
+  - Oct 5 test failed due to test script unconditionally adding `response_format` parameter
+  - Production adapter conditionally adds `response_format` only for compatible models
+  - GPT-OSS-120B succeeds via prompt-based JSON (no native JSON mode needed)
+  - Apache 2.0 licensed, 117B MoE architecture, $0.31/M blended cost
+  - **Added to curated model list** in Open Source / EU Hosting category
+- ❌ **openai/gpt-oss-20b** returns empty responses (smaller variant fundamentally broken, 1/10)
 
 **Key insights**:
 1. Native JSON mode (`response_format`) is NOT mandatory - many models work via prompts
