@@ -4,9 +4,9 @@
   "version": "v1.1",
   "supercontext": {
     "repository": "docling_langextract_testing",
-    "mission": "Capture the latest metadata fixes and model-catalog planning work in release notes, then stage a version bump before shipping the implementation orders."
+    "mission": "Document the 0.2.0 release encompassing GPT-5/Gemini 2.5 support, major UX overhaul, infrastructure improvements, and metadata fixes since initial 0.1.0 POC."
   },
-  "goal": "Document recent changes (OSS metadata anomalies, new orders), bump the project version appropriately, and prepare tagging instructions.",
+  "goal": "Create comprehensive release notes documenting 10+ new features, critical fixes, and infrastructure improvements, bump version to 0.2.0, and prepare tagging instructions.",
   "execution_instructions": [
     "Read CLAUDE.md and AGENTS.md for release workflow guardrails.",
     "Do not implement features or refactors here—focus on documentation and versioning metadata.",
@@ -24,20 +24,22 @@
     },
     {
       "id": "draft-release-notes",
-      "description": "Summarize recent work.",
+      "description": "Summarize recent work using order index as source of truth.",
       "steps": [
-        "Create or update `docs/reports/release-notes/<next-version>.md` (or `CHANGELOG.md`) with sections for \"Fixes\" (metadata model/timing gaps), \"Planning\" (model catalog v2 architecture), and \"Upcoming\" (implementation order).",
-        "Call out known limitations (e.g., Qwen still speculative until registry work lands).",
-        "Mention any new orders that stakeholders should execute next."
+        "Create `CHANGELOG.md` in repo root following keepachangelog.com format with sections: Added (new features), Fixed (bug fixes), Changed (architectural changes), Infrastructure (tooling/processes).",
+        "Use docs/orders/README.md order index as authoritative source for completed orders since 0.1.0. Reference completion reports from docs/reports/ for evidence.",
+        "Review git log since 0.1.0 for additional features not captured in orders (commits: GPT-5, Gemini 2.5, UX overhaul, OpenRouter SDK migration, pre-commit hooks).",
+        "Add Planning section listing upcoming work from order index (duckdb-ingestion-001, model-catalog-v2-architecture-001).",
+        "Call out known limitations (Qwen QwQ 32B at 7/10 quality, speculative models pending validation)."
       ]
     },
     {
       "id": "version-update",
-      "description": "Bump version metadata.",
+      "description": "Bump version to 0.2.0 (minor release).",
       "steps": [
-        "Determine whether the changes warrant a patch or minor bump (likely patch unless catalog refactor is imminent).",
-        "Update `pyproject.toml` (and other references) to the new version.",
-        "Note the rationale for the bump in the release notes."
+        "Update `pyproject.toml` version from 0.1.0 to 0.2.0 (MINOR bump justified by 10+ new features with backward compatibility).",
+        "Note the rationale in CHANGELOG.md: 'Minor bump due to significant feature additions (GPT-5, Gemini 2.5, UX overhaul, pre-commit hooks) while maintaining backward compatibility.'",
+        "Verify no other files reference hardcoded version numbers that need updating."
       ]
     },
     {
@@ -66,8 +68,8 @@
   },
   "testing": {
     "required_commands": [
-      "uv run python -m unittest discover -s tests -p \"test_classification_prompt.py\""
+      "uv run python tests/run_all_tests.py --quick"
     ],
-    "notes": "The goal is to confirm the repo is healthy before the release; no new tests are introduced here."
+    "notes": "Run full test suite to confirm repository health before 0.2.0 release. Use --quick flag to skip long-running performance benchmarks."
   }
 }

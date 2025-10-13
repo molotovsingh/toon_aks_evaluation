@@ -1,6 +1,6 @@
 [project]
 name = "docling-langextract-testing"
-version = "0.1.0"
+version = "0.2.0"
 description = "Testing docling + langextract combination for paralegal date extraction"
 readme = "README.md"
 requires-python = ">=3.12"
