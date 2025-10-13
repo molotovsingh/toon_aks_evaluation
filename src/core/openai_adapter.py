@@ -70,6 +70,7 @@ class OpenAIEventExtractor:
         # Validate model supports JSON mode
         self._supports_json_mode = self._check_json_mode_support(config.model)
         self._is_gpt5 = self._check_gpt5_model(config.model)
+        self._uses_responses_api = self._supports_reasoning_api(config.model)
 
         if not self._supports_json_mode:
             logger.warning(
@@ -77,10 +78,15 @@ class OpenAIEventExtractor:
                 f"Compatible models: {', '.join(JSON_MODE_COMPATIBLE_MODELS[:3])}..."
             )
 
-        if self._is_gpt5:
+        if self._uses_responses_api:
+            logger.info(
+                f"🧠 Model {config.model} will use Responses API for advanced reasoning. "
+                f"Outputs are non-deterministic (temperature=1.0)."
+            )
+        elif self._is_gpt5:
             logger.info(
                 f"✅ GPT-5 model detected: {config.model}. "
-                f"Using max_completion_tokens and temperature=1.0"
+                f"Using Chat Completions with max_completion_tokens and temperature=1.0"
             )
 
         # Lazy import OpenAI client
@@ -125,6 +131,23 @@ class OpenAIEventExtractor:
         """
         model_lower = model.lower()
         return any(gpt5_model in model_lower for gpt5_model in GPT5_MODELS)
+
+    def _supports_reasoning_api(self, model: str) -> bool:
+        """
+        Check if model should use Responses API for advanced reasoning
+
+        OpenAI's GPT-5 models use the Responses API for complex agentic/reasoning
+        tasks. This API provides better reasoning capabilities compared to Chat
+        Completions for tasks like legal event extraction.
+
+        Args:
+            model: Model identifier
+
+        Returns:
+            True if model should use Responses API (GPT-5 variants)
+        """
+        # GPT-5 models benefit from Responses API for reasoning tasks
+        return self._check_gpt5_model(model)
 
     def extract_events(self, text: str, metadata: Dict[str, Any]) -> List[EventRecord]:
         """
@@ -184,6 +207,10 @@ class OpenAIEventExtractor:
         """
         Make API call to OpenAI with exponential backoff retry logic
 
+        Routes to appropriate API based on model:
+        - GPT-5: Responses API (for advanced reasoning)
+        - Others: Chat Completions API
+
         Args:
             text: Document text to process
             max_retries: Maximum number of retry attempts
@@ -198,7 +225,12 @@ class OpenAIEventExtractor:
 
         for attempt in range(max_retries + 1):
             try:
-                return self._call_openai_api(text)
+                # Route to appropriate API based on model type
+                if self._uses_responses_api:
+                    logger.info(f"🧠 Using Responses API for reasoning model: {self.config.model}")
+                    return self._call_responses_api(text)
+                else:
+                    return self._call_openai_api(text)
 
             except RateLimitError as e:
                 if attempt < max_retries:
@@ -287,6 +319,93 @@ class OpenAIEventExtractor:
             }
         }
 
+    def _call_responses_api(self, text: str) -> Dict[str, Any]:
+        """
+        Call OpenAI Responses API for GPT-5 reasoning models
+
+        The Responses API is designed for advanced reasoning and agentic tasks,
+        providing better performance for complex extractions like legal events.
+
+        Args:
+            text: Document text to process
+
+        Returns:
+            API response data in standardized format
+
+        Raises:
+            OpenAIError: On API errors
+
+        Reference:
+            https://platform.openai.com/docs/guides/reasoning
+            https://platform.openai.com/docs/guides/latest-model
+        """
+        # Combine system prompt and user input into single input string
+        # Responses API uses 'input' parameter instead of 'messages' array
+        input_text = (
+            f"{LEGAL_EVENTS_PROMPT}\n\n"
+            f"Return your response as valid JSON array containing the extracted events.\n\n"
+            f"Extract legal events from this document:\n\n{text}"
+        )
+
+        # Call OpenAI Responses API with reasoning parameters
+        response = self._client.responses.create(
+            model=self.config.model,
+            input=input_text,
+            reasoning={"effort": "medium"},  # low, medium, high, or ultra
+            text={"verbosity": "medium"},     # low, medium, or high
+        )
+
+        # Track token usage and costs (Responses API has reasoning tokens)
+        if hasattr(response, "usage"):
+            reasoning_tokens = getattr(response.usage, "reasoning_tokens", 0)
+            input_tokens = response.usage.input_tokens
+            output_tokens = response.usage.output_tokens
+            total_tokens = reasoning_tokens + input_tokens + output_tokens
+
+            self._total_tokens += total_tokens
+            self._total_cost += self._calculate_cost_with_reasoning(
+                input_tokens,
+                output_tokens,
+                reasoning_tokens
+            )
+
+            # Log reasoning token usage for cost transparency
+            logger.info(
+                f"📊 GPT-5 Responses API tokens: "
+                f"reasoning={reasoning_tokens:,}, "
+                f"input={input_tokens:,}, "
+                f"output={output_tokens:,}, "
+                f"total={total_tokens:,}"
+            )
+
+            if reasoning_tokens > 0:
+                logger.info(
+                    f"ℹ️  GPT-5 uses non-deterministic reasoning (temperature=1.0) - "
+                    f"outputs will vary between runs"
+                )
+
+        # Convert Responses API format to standardized format
+        # Responses API returns output_text directly (not in choices structure)
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": response.output_text
+                    }
+                }
+            ],
+            "usage": {
+                "prompt_tokens": response.usage.input_tokens if hasattr(response, "usage") else 0,
+                "completion_tokens": response.usage.output_tokens if hasattr(response, "usage") else 0,
+                "reasoning_tokens": getattr(response.usage, "reasoning_tokens", 0) if hasattr(response, "usage") else 0,
+                "total_tokens": (
+                    response.usage.input_tokens +
+                    response.usage.output_tokens +
+                    getattr(response.usage, "reasoning_tokens", 0)
+                ) if hasattr(response, "usage") else 0,
+            }
+        }
+
     def _calculate_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
         """
         Calculate cost based on token usage
@@ -319,6 +438,45 @@ class OpenAIEventExtractor:
         # Calculate cost
         input_cost = (prompt_tokens / 1_000_000) * input_price
         output_cost = (completion_tokens / 1_000_000) * output_price
+
+        return input_cost + output_cost
+
+    def _calculate_cost_with_reasoning(
+        self,
+        input_tokens: int,
+        output_tokens: int,
+        reasoning_tokens: int
+    ) -> float:
+        """
+        Calculate cost including reasoning tokens (for Responses API)
+
+        Args:
+            input_tokens: Number of input tokens
+            output_tokens: Number of output tokens
+            reasoning_tokens: Number of reasoning tokens
+
+        Returns:
+            Estimated cost in USD
+        """
+        # Pricing per 1M tokens (reasoning tokens typically cost same as input tokens)
+        pricing = {
+            "gpt-5": (3.00, 12.00),      # GPT-5 series (estimated)
+            "gpt-4o": (2.50, 10.00),
+            "gpt-4o-mini": (0.15, 0.60),
+        }
+
+        # Find matching pricing
+        model_lower = self.config.model.lower()
+        input_price, output_price = (0.15, 0.60)  # Default to gpt-4o-mini
+
+        for model_key, prices in pricing.items():
+            if model_key in model_lower:
+                input_price, output_price = prices
+                break
+
+        # Calculate cost (reasoning tokens priced same as input tokens)
+        input_cost = ((input_tokens + reasoning_tokens) / 1_000_000) * input_price
+        output_cost = (output_tokens / 1_000_000) * output_price
 
         return input_cost + output_cost
 
