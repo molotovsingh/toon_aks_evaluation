@@ -17,6 +17,7 @@ MODEL_DISPLAY_NAMES = {
     "anthropic_claude-3-haiku": "Claude 3 Haiku",
     "openai_gpt-4o-mini": "GPT-4o-mini",
     "openai_gpt-oss-120b": "GPT-OSS-120B",
+    "meta-llama_llama-3.3-70b-instruct": "Llama 3.3 70B",
 }
 
 
@@ -74,7 +75,7 @@ def aggregate_results() -> Tuple[Dict, List[str], List[str]]:
             results[doc_name][model_key] = classification
 
     all_documents = sorted(results.keys())
-    all_models = ["Claude 3 Haiku", "GPT-4o-mini", "GPT-OSS-120B"]  # Fixed order
+    all_models = ["Claude 3 Haiku", "GPT-4o-mini", "GPT-OSS-120B", "Llama 3.3 70B"]  # Fixed order
 
     return results, all_documents, all_models
 
@@ -154,7 +155,7 @@ def generate_markdown_report(results: Dict, documents: List[str], models: List[s
     report.append("")
     report.append("**Date**: 2025-10-13")
     report.append("**Order**: doc-classification-claude-001")
-    report.append("**Models Tested**: Claude 3 Haiku, GPT-4o-mini, GPT-OSS-120B")
+    report.append("**Models Tested**: Claude 3 Haiku, GPT-4o-mini, GPT-OSS-120B, Llama 3.3 70B")
     report.append("")
     report.append("---")
     report.append("")
@@ -162,13 +163,14 @@ def generate_markdown_report(results: Dict, documents: List[str], models: List[s
     # Executive Summary
     report.append("## Executive Summary")
     report.append("")
-    report.append(f"Benchmarked 3 small models across **{len(documents)} legal documents** from 2 real-world cases:")
+    report.append(f"Benchmarked 4 models (2 proprietary, 2 open-source) across **{len(documents)} legal documents** from 2 real-world cases:")
     report.append("")
     report.append("- **Claude 3 Haiku** (Anthropic): $0.25/M, proprietary")
     report.append("- **GPT-4o-mini** (OpenAI): $0.15/M, proprietary")
     report.append("- **GPT-OSS-120B** (Apache 2.0): $0.31/M, open-source, self-hostable")
+    report.append("- **Llama 3.3 70B** (Meta): $0.60/M, open-source, self-hostable")
     report.append("")
-    report.append(f"**Key Finding**: {agreement['agreement_rate']:.1%} unanimous agreement across all 3 models on {agreement['unanimous']}/{agreement['total']} documents.")
+    report.append(f"**Key Finding**: {agreement['agreement_rate']:.1%} unanimous agreement across all 4 models on {agreement['unanimous']}/{agreement['total']} documents.")
     report.append("")
     report.append("---")
     report.append("")
@@ -199,24 +201,19 @@ def generate_markdown_report(results: Dict, documents: List[str], models: List[s
     # Model Comparison Table
     report.append("## Model Performance Comparison")
     report.append("")
-    report.append("| Metric | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B |")
-    report.append("|--------|----------------|-------------|--------------|")
+    report.append("| Metric | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B |")
+    report.append("|--------|----------------|-------------|--------------|---------------|")
 
-    for model in models:
-        if model in confidence_stats:
-            st = confidence_stats[model]
-            report.append(f"| **Documents Classified** | {st['count']} | {st['count']} | {confidence_stats.get('GPT-OSS-120B', {}).get('count', 0)} |")
-            break
+    # Documents classified row
+    counts = [confidence_stats.get(m, {}).get('count', 0) for m in models]
+    report.append(f"| **Documents Classified** | {counts[0]} | {counts[1]} | {counts[2]} | {counts[3]} |")
 
-    report.append(f"| **Pricing** | $0.25/M | $0.15/M | $0.31/M |")
-    report.append(f"| **License** | Proprietary | Proprietary | Apache 2.0 (OSS) |")
+    report.append(f"| **Pricing** | $0.25/M | $0.15/M | $0.31/M | $0.60/M |")
+    report.append(f"| **License** | Proprietary | Proprietary | Apache 2.0 (OSS) | Meta Llama (OSS) |")
 
-    for model in models:
-        if model in confidence_stats:
-            st = confidence_stats[model]
-            mean_conf = st['mean']
-            report.append(f"| **Mean Confidence** | {confidence_stats['Claude 3 Haiku']['mean']:.2f} | {confidence_stats['GPT-4o-mini']['mean']:.2f} | {confidence_stats.get('GPT-OSS-120B', {}).get('mean', 0):.2f} |")
-            break
+    # Mean confidence row
+    confs = [confidence_stats.get(m, {}).get('mean', 0) for m in models]
+    report.append(f"| **Mean Confidence** | {confs[0]:.2f} | {confs[1]:.2f} | {confs[2]:.2f} | {confs[3]:.2f} |")
 
     report.append("")
     report.append("---")
@@ -226,8 +223,8 @@ def generate_markdown_report(results: Dict, documents: List[str], models: List[s
     report.append("## Inter-Model Agreement")
     report.append("")
     report.append(f"**Unanimous Agreement**: {agreement['unanimous']}/{agreement['total']} documents ({agreement['agreement_rate']:.1%})")
-    report.append(f"**Partial Agreement** (2/3 models agree): {agreement['partial']} documents")
-    report.append(f"**Disagreements** (all differ): {len(agreement['disagreements']) - agreement['partial']} documents")
+    report.append(f"**Partial Agreement** (3/4 or 2/4 models agree): {agreement['partial']} documents")
+    report.append(f"**Disagreements** (varied predictions): {len(agreement['disagreements']) - agreement['partial']} documents")
     report.append("")
 
     # Disagreement Details
@@ -337,8 +334,8 @@ def generate_markdown_report(results: Dict, documents: List[str], models: List[s
     # Appendix: Full Classification Matrix
     report.append("## Appendix: Full Classification Matrix")
     report.append("")
-    report.append("| Document | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B |")
-    report.append("|----------|----------------|-------------|--------------|")
+    report.append("| Document | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B |")
+    report.append("|----------|----------------|-------------|--------------|---------------|")
 
     for doc in documents:
         row = [f"{doc[:50]}..." if len(doc) > 50 else doc]
