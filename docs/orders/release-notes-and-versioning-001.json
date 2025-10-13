@@ -1,0 +1,73 @@
+{
+  "order_id": "release-notes-and-versioning-001",
+  "priority": "medium",
+  "version": "v1.1",
+  "supercontext": {
+    "repository": "docling_langextract_testing",
+    "mission": "Capture the latest metadata fixes and model-catalog planning work in release notes, then stage a version bump before shipping the implementation orders."
+  },
+  "goal": "Document recent changes (OSS metadata anomalies, new orders), bump the project version appropriately, and prepare tagging instructions.",
+  "execution_instructions": [
+    "Read CLAUDE.md and AGENTS.md for release workflow guardrails.",
+    "Do not implement features or refactors here—focus on documentation and versioning metadata.",
+    "If the working tree is dirty, resolve or document before proceeding."
+  ],
+  "tasks": [
+    {
+      "id": "status-audit",
+      "description": "Establish the current baseline.",
+      "steps": [
+        "Run `git status` to ensure only intended files are touched.",
+        "Record the current version from `pyproject.toml`.",
+        "Review existing release notes/CHANGELOG to determine the last published entry."
+      ]
+    },
+    {
+      "id": "draft-release-notes",
+      "description": "Summarize recent work.",
+      "steps": [
+        "Create or update `docs/reports/release-notes/<next-version>.md` (or `CHANGELOG.md`) with sections for \"Fixes\" (metadata model/timing gaps), \"Planning\" (model catalog v2 architecture), and \"Upcoming\" (implementation order).",
+        "Call out known limitations (e.g., Qwen still speculative until registry work lands).",
+        "Mention any new orders that stakeholders should execute next."
+      ]
+    },
+    {
+      "id": "version-update",
+      "description": "Bump version metadata.",
+      "steps": [
+        "Determine whether the changes warrant a patch or minor bump (likely patch unless catalog refactor is imminent).",
+        "Update `pyproject.toml` (and other references) to the new version.",
+        "Note the rationale for the bump in the release notes."
+      ]
+    },
+    {
+      "id": "tagging-prep",
+      "description": "Prepare for release tagging.",
+      "steps": [
+        "Verify the working tree is clean aside from release note/version files.",
+        "Document tagging instructions (e.g., `git tag -a vX.Y.Z -m \"Release notes\"`).",
+        "List follow-on tasks (run metadata fix order, execute catalog implementation)."
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "Release notes reflect the metadata issues, architecture planning, and next steps.",
+    "Version in `pyproject.toml` is bumped with a documented rationale.",
+    "Tagging instructions are recorded and the working tree is clean.",
+    "Known limitations and upcoming work are clearly communicated."
+  ],
+  "constraints": {
+    "what_not_to_do": [
+      "Do not modify code apart from version strings.",
+      "Do not push tags/commits—provide instructions only.",
+      "Avoid editing unrelated documentation or configs unless required for the release entry."
+    ],
+    "escalation_guidance": "If conflicting version numbers exist, document the discrepancy and pause the order for clarification."
+  },
+  "testing": {
+    "required_commands": [
+      "uv run python -m unittest discover -s tests -p \"test_classification_prompt.py\""
+    ],
+    "notes": "The goal is to confirm the repo is healthy before the release; no new tests are introduced here."
+  }
+}

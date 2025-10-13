@@ -256,5 +256,21 @@ Move with special note:
 
 ---
 
+## 2025-10-13 Additional Archival
+
+### metadata-runtime-model-accuracy-001-COMPLETED.md
+- **Status**: ✅ COMPLETE
+- **Evidence**: Self-contained completion report (embedded in the order file)
+- **Completion Date**: 2025-10-13
+- **Summary**: Fixed metadata exports to capture actual runtime model selections and corrected timing metrics calculation
+- **Commits**:
+  - `8de74dd` - Runtime model override capture fix
+  - `3eab946` - Timing metrics calculation fix
+- **Test Results**: 9/9 unit tests passing
+- **Action**: Archived with completion reference
+
+---
+
 *Audit completed: 2025-10-09*
 *Next audit recommended after: 2025-11-09 (monthly cadence)*
+*Last update: 2025-10-13 (single order archival)*

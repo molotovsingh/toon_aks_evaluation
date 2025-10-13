@@ -1,0 +1,75 @@
+{
+  "order_id": "duckdb-ingestion-001",
+  "priority": "medium",
+  "version": "v1.0",
+  "supercontext": {
+    "repository": "docling_langextract_testing",
+    "mission": "Capture pipeline metadata in a queryable DuckDB store so future FastAPI analytics can run on a single source of truth."
+  },
+  "goal": "Create a lightweight DuckDB database for legal-events runs, build an ingestion script, and provide basic query helpers for local analysis.",
+  "execution_instructions": [
+    "Confirm metadata exports are accurate (see `metadata-runtime-model-accuracy-001` order) before ingesting.",
+    "Keep the solution simple: no external services or ORMs—just DuckDB and a thin Python module.",
+    "Do not modify the Streamlit app in this order; focus on offline ingestion/query tooling."
+  ],
+  "tasks": [
+    {
+      "id": "schema-design",
+      "description": "Define the DuckDB table structure.",
+      "steps": [
+        "Inspect `src/core/pipeline_metadata.py` to list columns to persist (run_id, provider_model, timing, cost, etc.).",
+        "Decide how to store nested fields (`config_snapshot`)—use a DuckDB JSON column or serialize to text.",
+        "Document the schema in `docs/reports/duckdb-ingestion-plan.md` for future reference."
+      ]
+    },
+    {
+      "id": "ingestion-script",
+      "description": "Build a Python utility to load `_metadata.json` files.",
+      "steps": [
+        "Create `scripts/ingest_metadata_to_duckdb.py` (or similar) that scans `output/**/_metadata.json` and upserts into `runs.duckdb`.",
+        "Ensure the script is idempotent (skip existing run_id or provide `--replace` flag).",
+        "Expose CLI arguments for input glob, database path, and optional dry-run."
+      ]
+    },
+    {
+      "id": "query-helpers",
+      "description": "Provide simple analytics helpers.",
+      "steps": [
+        "Add a small module or notebook (`notebooks/duckdb_examples.ipynb` or `scripts/query_duckdb.py`) showing example queries (avg extractor time by model, runs per provider).",
+        "Document how to connect to the DuckDB file from Python (`duckdb.connect(\"runs.duckdb\")`).",
+        "If notebooks aren’t desired, include sample SQL in the plan document."
+      ]
+    },
+    {
+      "id": "testing-and-validation",
+      "description": "Verify the pipeline end-to-end.",
+      "steps": [
+        "Run the ingestion script against existing metadata files (preferably after fixing runtime model logging).",
+        "Execute a few sample queries and capture output in the work summary.",
+        "Add a lightweight unit test (e.g., using `tmp_path`) to ensure the script writes expected rows."
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "`runs.duckdb` (or documented path) contains a table with one row per legal-events run.",
+    "Ingestion script is documented, idempotent, and lives under `scripts/` with CLI usage instructions.",
+    "Example queries (SQL or Python snippets) are provided so others can explore the data immediately.",
+    "Unit test or integration check confirms ingestion succeeds on sample metadata."
+  ],
+  "constraints": {
+    "what_not_to_do": [
+      "Do not introduce external database services—DuckDB should remain file-based.",
+      "Do not refactor Streamlit or pipeline code to write directly to DuckDB in this order.",
+      "Avoid heavy dependencies; stick to `duckdb` Python package and standard library."
+    ],
+    "escalation_guidance": "If metadata files are missing required fields, note the gaps and stop—the ingestion script should not guess values."
+  },
+  "testing": {
+    "required_commands": [
+      "uv run python scripts/ingest_metadata_to_duckdb.py --help",
+      "uv run python scripts/ingest_metadata_to_duckdb.py --db runs.duckdb --glob \"output/**/_metadata.json\"",
+      "uv run python -m unittest tests/test_duckdb_ingestion.py"
+    ],
+    "notes": "Replace the glob with a narrower path during development if needed."
+  }
+}

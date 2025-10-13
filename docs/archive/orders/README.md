@@ -112,13 +112,35 @@ Created comprehensive README files for order management workflow:
 
 ---
 
+## 2025-10-13 Archival - Metadata Runtime Model Order
+
+**Order**: metadata-runtime-model-accuracy-001-COMPLETED.md
+**Status**: ✅ COMPLETE
+**Evidence**: Self-contained completion report with 9/9 unit tests passing
+**Commits**:
+- `8de74dd` - Runtime model override capture fix
+- `3eab946` - Timing metrics calculation fix
+
+### Summary
+
+Fixed critical metadata export issues:
+1. **Runtime Model Capture**: Metadata now correctly captures actual model selections (e.g., `openai/gpt-oss-120b`) instead of environment defaults (`openai/gpt-4o-mini`)
+2. **Timing Metrics Fix**: Corrected timing calculation from incorrect sum to first value extraction
+
+**Implementation**: Added 3-strategy lookup pattern in `pipeline_metadata.py` with comprehensive unit tests covering all 5 provider types (OpenRouter, OpenAI, Anthropic, LangExtract, DeepSeek).
+
+**Completion**: Order file includes full completion report with technical details, test results, and manual verification steps.
+
+---
+
 ## Archive History
 
 - **2025-10-04**: Initial archive with 4 housekeeping orders
 - **2025-10-09**: Archival batch - 15 development orders (14 complete + 1 superseded)
 - **2025-10-09**: Additional archival - orders-readme-001 (expanded scope)
+- **2025-10-13**: Single order archival - metadata-runtime-model-accuracy-001 (metadata fixes)
 
-**Total Archived**: 20 orders (4 housekeeping + 15 development + 1 README)
+**Total Archived**: 21 orders (4 housekeeping + 15 development + 1 README + 1 metadata fix)
 
 ## Archive Date
-Last Updated: 2025-10-09
+Last Updated: 2025-10-13
