@@ -43,7 +43,7 @@ st.markdown("""
 /* === GLOBAL STYLES === */
 .main-header {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 1.5rem;
+    font-size: 1.35rem;
     font-weight: 700;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     -webkit-background-clip: text;
@@ -54,7 +54,7 @@ st.markdown("""
 }
 .main-caption {
     font-family: 'Inter', sans-serif;
-    font-size: 0.85rem;
+    font-size: 0.765rem;
     color: #64748b;
     text-align: center;
     margin-bottom: 1rem;
@@ -69,7 +69,7 @@ div[data-testid="column"] > div > div > button {
     border-radius: 8px !important;
     padding: 0.75rem 0.75rem !important;
     font-weight: 600 !important;
-    font-size: 0.95rem !important;
+    font-size: 0.855rem !important;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
     height: auto !important;
@@ -138,7 +138,7 @@ div[data-testid="column"]:nth-child(3) button[kind="primary"]:hover {
     gap: 0.25rem;
     padding: 0.25rem 0.5rem;
     border-radius: 12px;
-    font-size: 0.7rem;
+    font-size: 0.63rem;
     font-weight: 600;
     margin-top: 0.125rem;
 }
@@ -155,7 +155,7 @@ div[data-testid="column"]:nth-child(3) button[kind="primary"]:hover {
 
 /* === SECTION HEADERS === */
 .section-header {
-    font-size: 0.75rem;
+    font-size: 0.675rem;
     font-weight: 700;
     color: #1e293b;
     text-transform: uppercase;
@@ -196,13 +196,13 @@ div[data-testid="stExpander"] {
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
 }
 .metric-value {
-    font-size: 1.75rem;
+    font-size: 1.575rem;
     font-weight: 700;
     margin: 0.25rem 0;
     text-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 .metric-label {
-    font-size: 0.75rem;
+    font-size: 0.675rem;
     opacity: 0.95;
     font-weight: 500;
 }
@@ -217,11 +217,11 @@ hr {
 
 /* === CAPTIONS & TEXT === */
 .stMarkdown {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
 }
 div[data-testid="stCaptionContainer"] {
     color: #64748b !important;
-    font-size: 0.75rem !important;
+    font-size: 0.675rem !important;
     margin-top: 0.125rem !important;
 }
 
@@ -255,12 +255,12 @@ div[data-testid="stCaptionContainer"] {
     padding: 0.6rem 0.5rem;
     text-align: center;
     background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    font-size: 0.75rem;
+    font-size: 0.675rem;
     color: #64748b;
     vertical-align: middle;
 }
 .pipeline-stage-header {
-    font-size: 0.65rem;
+    font-size: 0.585rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -268,7 +268,7 @@ div[data-testid="stCaptionContainer"] {
     margin-bottom: 0.25rem;
 }
 .pipeline-stage-value {
-    font-size: 0.85rem;
+    font-size: 0.765rem;
     font-weight: 600;
     color: #1e293b;
 }
@@ -282,7 +282,7 @@ div[data-testid="stCaptionContainer"] {
     border-right: 3px solid #8b5cf6;
 }
 .pipeline-arrow {
-    font-size: 1.2rem;
+    font-size: 1.08rem;
     color: #cbd5e1;
     font-weight: 300;
     padding: 0 0.25rem;
@@ -318,19 +318,19 @@ def create_pipeline_status(doc_extractor: str, provider: str, model: str = None)
     """
     # Stage 1: Document Processing
     doc_display_map = {
-        'docling': '🔧 Docling<br><span style="font-size:0.7rem;">Local OCR</span>',
-        'gemini': '🌟 Gemini 2.5<br><span style="font-size:0.7rem;">Cloud Vision</span>'
+        'docling': '🔧 Docling<br><span style="font-size:0.63rem;">Local OCR</span>',
+        'gemini': '🌟 Gemini 2.5<br><span style="font-size:0.63rem;">Cloud Vision</span>'
     }
     doc_display = doc_display_map.get(doc_extractor, doc_extractor)
 
     # Stage 2: Event Extraction Provider
     provider_display_map = {
-        'langextract': '🔮 Gemini<br><span style="font-size:0.7rem;">LangExtract</span>',
-        'openrouter': '🌐 OpenRouter<br><span style="font-size:0.7rem;">18+ Models</span>',
-        'opencode_zen': '⚖️ OpenCode Zen<br><span style="font-size:0.7rem;">Legal AI</span>',
-        'openai': '🧠 OpenAI<br><span style="font-size:0.7rem;">GPT-4o</span>',
-        'anthropic': '🎯 Anthropic<br><span style="font-size:0.7rem;">Claude 3.5</span>',
-        'deepseek': '🔍 DeepSeek<br><span style="font-size:0.7rem;">R1 Chat</span>'
+        'langextract': '🔮 Gemini<br><span style="font-size:0.63rem;">LangExtract</span>',
+        'openrouter': '🌐 OpenRouter<br><span style="font-size:0.63rem;">18+ Models</span>',
+        'opencode_zen': '⚖️ OpenCode Zen<br><span style="font-size:0.63rem;">Legal AI</span>',
+        'openai': '🧠 OpenAI<br><span style="font-size:0.63rem;">GPT-4o</span>',
+        'anthropic': '🎯 Anthropic<br><span style="font-size:0.63rem;">Claude 3.5</span>',
+        'deepseek': '🔍 DeepSeek<br><span style="font-size:0.63rem;">R1 Chat</span>'
     }
     provider_display = provider_display_map.get(provider, provider)
 
@@ -343,9 +343,9 @@ def create_pipeline_status(doc_extractor: str, provider: str, model: str = None)
         matching_models = [m for m in MODEL_CATALOG if m.model_id == model]
         if matching_models:
             model_obj = matching_models[0]
-            model_display = f'{model_obj.display_name}<br><span style="font-size:0.7rem;">{model_obj.cost_per_1m}</span>'
+            model_display = f'{model_obj.display_name}<br><span style="font-size:0.63rem;">{model_obj.cost_per_1m}</span>'
         else:
-            model_display = f'{model_short}<br><span style="font-size:0.7rem;">Selected</span>'
+            model_display = f'{model_short}<br><span style="font-size:0.63rem;">Selected</span>'
     else:
         model_display = '<span style="font-style:italic; color:#94a3b8;">Not selected</span>'
 
@@ -1074,7 +1074,7 @@ def create_provider_selection():
         if st.button(
             "🌐 OpenRouter",
             key="provider_openrouter",
-            use_container_width=True,
+            width="stretch",
             type="primary" if is_openrouter_selected else "secondary"
         ):
             if st.session_state.selected_provider != 'openrouter':
@@ -1097,7 +1097,7 @@ def create_provider_selection():
         if st.button(
             "🔮 Gemini",
             key="provider_langextract",
-            use_container_width=True,
+            width="stretch",
             type="primary" if is_langextract_selected else "secondary"
         ):
             if st.session_state.selected_provider != 'langextract':
@@ -1120,7 +1120,7 @@ def create_provider_selection():
         if st.button(
             "🧠 OpenAI",
             key="provider_openai",
-            use_container_width=True,
+            width="stretch",
             type="primary" if is_openai_selected else "secondary"
         ):
             if st.session_state.selected_provider != 'openai':
@@ -1189,7 +1189,7 @@ def create_provider_selection():
                 if st.button(
                     f"{icon_name}",
                     key=f"provider_{key}",
-                    use_container_width=True,
+                    width="stretch",
                     type="primary" if is_selected else "secondary"
                 ):
                     if st.session_state.selected_provider != key:
@@ -1271,7 +1271,7 @@ def create_polished_metrics(legal_events_df):
             <div class="metric-card">
                 <div class="metric-label">📝 Avg Detail</div>
                 <div class="metric-value">{avg_chars:.0f}</div>
-                <div class="metric-label" style="font-size: 0.7rem;">characters</div>
+                <div class="metric-label" style="font-size: 0.63rem;">characters</div>
             </div>
             """,
             unsafe_allow_html=True
@@ -1358,7 +1358,7 @@ def create_file_upload_section():
         with st.expander(f"📄 File Details ({len(uploaded_files)} file{'s' if len(uploaded_files) > 1 else ''})", expanded=True):
             import pandas as pd
             summary_df = pd.DataFrame(file_data)
-            st.dataframe(summary_df, use_container_width=True, hide_index=True)
+            st.dataframe(summary_df, width="stretch", hide_index=True)
 
     return uploaded_files
 
@@ -1415,9 +1415,9 @@ def main():
 
         # Quick sample document button
         st.markdown('<div class="section-header">⚡ Quick Test</div>', unsafe_allow_html=True)
-        if st.button("📄 Try Sample Document", use_container_width=True, help="Load the Famas arbitration PDF for testing"):
+        if st.button("📄 Try Sample Document", width="stretch", help="Load the Famas arbitration PDF for testing"):
             from pathlib import Path
-            sample_path = Path("sample_pdf/famas_dispute/Answer to Request for Arbitration.pdf")
+            sample_path = Path("sample_pdf/famas_dispute/testfile.pdf")
 
             if sample_path.exists():
                 # Store sample file info in session state
@@ -1434,7 +1434,7 @@ def main():
         # Handle sample document if requested
         if st.session_state.get('use_sample', False) and not uploaded_files:
             from pathlib import Path
-            sample_path = Path("sample_pdf/famas_dispute/Answer to Request for Arbitration.pdf")
+            sample_path = Path("sample_pdf/famas_dispute/testfile.pdf")
 
             if sample_path.exists():
                 # Read sample file and create a file-like object
@@ -1446,7 +1446,7 @@ def main():
                 st.info(f"📄 Ready to process: **{sample_path.name}** (930 KB)")
 
         if files_to_process:
-            if st.button("Process Files", type="primary", use_container_width=True):
+            if st.button("Process Files", type="primary", width="stretch"):
                 # Enhanced status container with context
                 status_container = st.empty()
 
@@ -1533,7 +1533,7 @@ def main():
         from src.core.constants import FIVE_COLUMN_HEADERS
         st.dataframe(
             legal_events_df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             column_config={
                 FIVE_COLUMN_HEADERS[0]: st.column_config.NumberColumn(FIVE_COLUMN_HEADERS[0], width="small"),
