@@ -13,7 +13,7 @@
 ## Order Index - Complete Status
 
 **Last Updated**: 2025-10-13
-**Total Orders**: 16 (1 template + 4 completed + 5 active + 3 planning + 2 needs investigation + 1 superseded)
+**Total Orders**: 16 (1 template + 6 completed + 5 active + 2 planning + 1 needs investigation + 1 superseded)
 
 ### Status Legend
 - 📋 **Template** - Reference blueprint for creating new orders
@@ -34,7 +34,7 @@
 
 ---
 
-### ✅ Completed Orders (4)
+### ✅ Completed Orders (6)
 
 | Order ID | Priority | Version | Completion Evidence | Description | Links |
 |----------|----------|---------|---------------------|-------------|-------|
@@ -42,6 +42,8 @@
 | **pre-commit-python-guardrail-001** | Medium | v1.0 | 2025-10-11 | Pre-commit hook for Python syntax checks and fast tests | [📄](pre-commit-python-guardrail-001.json) · [✅ Hook](../../hooks/pre-commit) |
 | **eml-normalization-001** | High | v1.0 | 2025-10-10 | Normalize .eml ingestion for clean email text extraction | [📄](eml-normalization-001.json) · [✅ Report](../reports/eml-normalization-001-completion.md) |
 | **order-index-001** | Medium | v1.0 | 2025-10-13 | Create comprehensive order status index with 100% visibility | [📄](order-index-001.json) · [✅ Commit](../../commit/fe65ee4) |
+| **event-extractor-001** | High | v1.0 | 2025-09-30 | Enable configurable event extractor providers (LangExtract, OpenRouter, OpenCode Zen) | [📄](event-extractor-001.json) · [✅ Reports](../reports/event-extractor-003-completion-report.md) |
+| **release-notes-and-versioning-001** | Medium | v1.1 | 2025-10-13 | Document v0.2.0 release with comprehensive feature additions | [📄](release-notes-and-versioning-001.json) · [✅ Tag](../../releases/tag/v0.2.0) |
 
 ---
 
@@ -57,21 +59,19 @@
 
 ---
 
-### 📝 Planning Orders (3)
+### 📝 Planning Orders (2)
 
 | Order ID | Priority | Version | Description | Links |
 |----------|----------|---------|-------------|-------|
 | **model-catalog-v2-architecture-001** | High | v2.0 | Design centralized model registry with metadata propagation | [📄](model-catalog-v2-architecture-001.json) |
 | **duckdb-ingestion-001** | Medium | v1.0 | Create DuckDB database for pipeline metadata with ingestion script | [📄](duckdb-ingestion-001.json) |
-| **release-notes-and-versioning-001** | Medium | v1.1 | Document recent changes, bump version, prepare git tag | [📄](release-notes-and-versioning-001.json) |
 
 ---
 
-### ⚠️ Needs Investigation (2)
+### ⚠️ Needs Investigation (1)
 
 | Order ID | Priority | Version | Status Notes | Description | Links |
 |----------|----------|---------|--------------|-------------|-------|
-| **event-extractor-001** | High | v1.0 | No completion evidence found | Enable configurable event extractor providers (LangExtract, OpenRouter, OpenCode Zen) | [📄](event-extractor-001.json) |
 | **doc-parsing-fastpath-001** | High | v1.0 | No completion evidence found | PyMuPDF fast path for digital PDFs + ocrmypdf pre-OCR for scanned PDFs | [📄](doc-parsing-fastpath-001.json) |
 
 ---
