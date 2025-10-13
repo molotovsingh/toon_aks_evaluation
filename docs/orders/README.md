@@ -13,7 +13,7 @@
 ## Order Index - Complete Status
 
 **Last Updated**: 2025-10-13
-**Total Orders**: 16 (1 template + 6 completed + 5 active + 2 planning + 1 needs investigation + 1 superseded)
+**Total Orders**: 16 (1 template + 6 completed + 4 active + 2 planning + 1 needs investigation + 2 superseded)
 
 ### Status Legend
 - 📋 **Template** - Reference blueprint for creating new orders
@@ -47,12 +47,11 @@
 
 ---
 
-### 🔄 Active Orders (5)
+### 🔄 Active Orders (4)
 
 | Order ID | Priority | Version | Description | Links |
 |----------|----------|---------|-------------|-------|
 | **doc-classification-claude-001** | High | v1.0 | Benchmark small models (Claude Haiku, GPT-4o-mini) for document classification | [📄](doc-classification-claude-001.json) |
-| **openrouter-gpt5-ux-001** | Medium | v1.0 | Add GPT-5 to OpenRouter model selector UI | [📄](openrouter-gpt5-ux-001.json) |
 | **git-housekeeping-001-triage** | Medium | v1.0 | Phase 1: Read-only repository triage (file categorization, .gitignore gaps) | [📄](git-housekeeping-001-triage.json) |
 | **git-housekeeping-001-execute** | Medium | v1.0 | Phase 2: Execute housekeeping (harden .gitignore, prune refs, cleanup) — **Requires clean baseline** | [📄](git-housekeeping-001-execute.json) |
 | **order-archival-001** | Medium | v1.0 | Automate archival workflow for completed orders | [📄](order-archival-001.json) |
@@ -76,11 +75,12 @@
 
 ---
 
-### 🔁 Superseded Orders (1)
+### 🔁 Superseded Orders (2)
 
-| Order ID | Version | Superseded Date | Replaced By | Links |
-|----------|---------|-----------------|-------------|-------|
-| **git-housekeeping-001** | v1.0 | 2025-10-11 | git-housekeeping-001-triage.json + git-housekeeping-001-execute.json | [📄](git-housekeeping-001.json) |
+| Order ID | Version | Superseded Date | Reason | Links |
+|----------|---------|-----------------|--------|-------|
+| **git-housekeeping-001** | v1.0 | 2025-10-11 | Split into triage + execute phases | [📄](git-housekeeping-001.json) |
+| **openrouter-gpt5-ux-001** | v1.0 | 2025-10-13 | Cancelled - GPT-5 already available via direct OpenAI provider | [📄](openrouter-gpt5-ux-001.json) |
 
 ---
 
