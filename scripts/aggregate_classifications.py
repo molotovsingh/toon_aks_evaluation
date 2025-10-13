@@ -18,6 +18,7 @@ MODEL_DISPLAY_NAMES = {
     "openai_gpt-4o-mini": "GPT-4o-mini",
     "openai_gpt-oss-120b": "GPT-OSS-120B",
     "meta-llama_llama-3.3-70b-instruct": "Llama 3.3 70B",
+    "mistralai_mistral-large-2411": "Mistral Large 2411",
     "gpt-5": "GPT-5 (Ground Truth)",
 }
 
@@ -76,7 +77,7 @@ def aggregate_results() -> Tuple[Dict, List[str], List[str]]:
             results[doc_name][model_key] = classification
 
     all_documents = sorted(results.keys())
-    all_models = ["Claude 3 Haiku", "GPT-4o-mini", "GPT-OSS-120B", "Llama 3.3 70B", "GPT-5 (Ground Truth)"]  # Fixed order
+    all_models = ["Claude 3 Haiku", "GPT-4o-mini", "GPT-OSS-120B", "Llama 3.3 70B", "Mistral Large 2411", "GPT-5 (Ground Truth)"]  # Fixed order
 
     return results, all_documents, all_models
 
@@ -235,19 +236,19 @@ def generate_markdown_report(results: Dict, documents: List[str], models: List[s
     # Model Comparison Table
     report.append("## Model Performance Comparison")
     report.append("")
-    report.append("| Metric | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B | GPT-5 (Ground Truth) |")
-    report.append("|--------|----------------|-------------|--------------|---------------|----------------------|")
+    report.append("| Metric | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B | Mistral Large 2411 | GPT-5 (Ground Truth) |")
+    report.append("|--------|----------------|-------------|--------------|---------------|--------------------|--------------------|")
 
     # Documents classified row
     counts = [confidence_stats.get(m, {}).get('count', 0) for m in models]
-    report.append(f"| **Documents Classified** | {counts[0]} | {counts[1]} | {counts[2]} | {counts[3]} | {counts[4]} |")
+    report.append(f"| **Documents Classified** | {counts[0]} | {counts[1]} | {counts[2]} | {counts[3]} | {counts[4]} | {counts[5]} |")
 
-    report.append(f"| **Pricing** | $0.25/M | $0.15/M | $0.31/M | $0.60/M | TBD |")
-    report.append(f"| **License** | Proprietary | Proprietary | Apache 2.0 (OSS) | Meta Llama (OSS) | Proprietary |")
+    report.append(f"| **Pricing** | $0.25/M | $0.15/M | $0.31/M | $0.60/M | $4.00/M | TBD |")
+    report.append(f"| **License** | Proprietary | Proprietary | Apache 2.0 (OSS) | Meta Llama (OSS) | Proprietary | Proprietary |")
 
     # Mean confidence row
     confs = [confidence_stats.get(m, {}).get('mean', 0) for m in models]
-    report.append(f"| **Mean Confidence** | {confs[0]:.2f} | {confs[1]:.2f} | {confs[2]:.2f} | {confs[3]:.2f} | {confs[4]:.2f} |")
+    report.append(f"| **Mean Confidence** | {confs[0]:.2f} | {confs[1]:.2f} | {confs[2]:.2f} | {confs[3]:.2f} | {confs[4]:.2f} | {confs[5]:.2f} |")
 
     report.append("")
     report.append("---")
@@ -398,8 +399,8 @@ def generate_markdown_report(results: Dict, documents: List[str], models: List[s
     # Appendix: Full Classification Matrix
     report.append("## Appendix: Full Classification Matrix")
     report.append("")
-    report.append("| Document | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B | GPT-5 (Ground Truth) |")
-    report.append("|----------|----------------|-------------|--------------|---------------|----------------------|")
+    report.append("| Document | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B | Mistral Large 2411 | GPT-5 (Ground Truth) |")
+    report.append("|----------|----------------|-------------|--------------|---------------|--------------------|--------------------|")
 
     for doc in documents:
         row = [f"{doc[:50]}..." if len(doc) > 50 else doc]

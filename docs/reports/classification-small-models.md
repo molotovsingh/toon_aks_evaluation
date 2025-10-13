@@ -42,12 +42,12 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 
 ## Model Performance Comparison
 
-| Metric | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B | GPT-5 (Ground Truth) |
-|--------|----------------|-------------|--------------|---------------|----------------------|
-| **Documents Classified** | 22 | 22 | 15 | 20 | 21 |
-| **Pricing** | $0.25/M | $0.15/M | $0.31/M | $0.60/M | TBD |
-| **License** | Proprietary | Proprietary | Apache 2.0 (OSS) | Meta Llama (OSS) | Proprietary |
-| **Mean Confidence** | 0.86 | 0.76 | 0.78 | 0.84 | 0.88 |
+| Metric | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B | Mistral Large 2411 | GPT-5 (Ground Truth) |
+|--------|----------------|-------------|--------------|---------------|--------------------|--------------------|
+| **Documents Classified** | 22 | 22 | 15 | 20 | 20 | 21 |
+| **Pricing** | $0.25/M | $0.15/M | $0.31/M | $0.60/M | $4.00/M | TBD |
+| **License** | Proprietary | Proprietary | Apache 2.0 (OSS) | Meta Llama (OSS) | Proprietary | Proprietary |
+| **Mean Confidence** | 0.86 | 0.76 | 0.78 | 0.84 | 0.85 | 0.88 |
 
 ---
 
@@ -59,6 +59,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 |-------|---------------|----------------|----------|
 | **Llama 3.3 70B** | 15/20 | 20 | 75.0% |
 | **GPT-OSS-120B** | 11/15 | 15 | 73.3% |
+| **Mistral Large 2411** | 14/20 | 20 | 70.0% |
 | **Claude 3 Haiku** | 13/21 | 21 | 61.9% |
 | **GPT-4o-mini** | 13/21 | 21 | 61.9% |
 
@@ -79,6 +80,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 - GPT-4o-mini: `Other`
 - GPT-OSS-120B: `Other`
 - Llama 3.3 70B: `Evidence/Exhibit`
+- Mistral Large 2411: `Other`
 - GPT-5 (Ground Truth): `Evidence/Exhibit`
 
 **Amrapali_Builder_Buyer_Agreement**:
@@ -86,6 +88,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 - GPT-4o-mini: `Agreement/Contract`
 - GPT-OSS-120B: `Other`
 - Llama 3.3 70B: `Agreement/Contract`
+- Mistral Large 2411: `Agreement/Contract`
 - GPT-5 (Ground Truth): `Agreement/Contract`
 
 **Amrapali_D.D-CHEQUE_COPY**:
@@ -93,6 +96,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 - GPT-4o-mini: `Other`
 - GPT-OSS-120B: `Evidence/Exhibit`
 - Llama 3.3 70B: `Other`
+- Mistral Large 2411: `Other`
 - GPT-5 (Ground Truth): `Evidence/Exhibit`
 
 **Amrapali_No_Objection**:
@@ -100,6 +104,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 - GPT-4o-mini: `Agreement/Contract`
 - GPT-OSS-120B: `Correspondence`
 - Llama 3.3 70B: `Agreement/Contract`
+- Mistral Large 2411: `Agreement/Contract`
 - GPT-5 (Ground Truth): `Evidence/Exhibit`
 
 **Amrapali_Receipts_-_2nd_Buyer**:
@@ -107,6 +112,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 - GPT-4o-mini: `Other`
 - GPT-OSS-120B: `Evidence/Exhibit`
 - Llama 3.3 70B: `Other`
+- Mistral Large 2411: `Other`
 - GPT-5 (Ground Truth): `Evidence/Exhibit`
 
 **Amrapali_Reciepts__1st_Buyer**:
@@ -114,6 +120,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 - GPT-4o-mini: `Other`
 - GPT-OSS-120B: `Evidence/Exhibit`
 - Llama 3.3 70B: `Agreement/Contract`
+- Mistral Large 2411: `Agreement/Contract`
 - GPT-5 (Ground Truth): `Evidence/Exhibit`
 
 **Answer_to_request_for_Arbitration-_Case_Reference__DIS-IHK-2025-01180-_Famas_GmbH_vs_Elcomponics_Sales_Pvt_Ltd**:
@@ -121,6 +128,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 - GPT-4o-mini: `Correspondence`
 - GPT-OSS-120B: `Correspondence`
 - Llama 3.3 70B: `Correspondence`
+- Mistral Large 2411: `Correspondence`
 - GPT-5 (Ground Truth): `Correspondence`
 
 **FaMAS_GmbH_Vs_Elcomponics_Sales_Pvt._Ltd,_O_s_Amount_Euro_245,000,_File_Ref_#_29260CFIN_2024**:
@@ -128,6 +136,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 - GPT-4o-mini: `Correspondence`
 - GPT-OSS-120B: `Correspondence`
 - Llama 3.3 70B: `Correspondence`
+- Mistral Large 2411: `Correspondence`
 - GPT-5 (Ground Truth): `Correspondence`
 
 **RE__CASE_NO_2406230011_____ELCOMPONICS_SALES_PRIVATE_LIMITED____FILE_NO_18428**:
@@ -135,6 +144,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 - GPT-4o-mini: `Correspondence`
 - GPT-OSS-120B: `Other`
 - Llama 3.3 70B: `Correspondence`
+- Mistral Large 2411: `Correspondence`
 - GPT-5 (Ground Truth): `Correspondence`
 
 **Transaction_Fee_Invoice**:
@@ -142,6 +152,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 - GPT-4o-mini: `Other`
 - GPT-OSS-120B: `Other`
 - Llama 3.3 70B: `Other`
+- Mistral Large 2411: `Other`
 - GPT-5 (Ground Truth): `Other`
 
 **abc_xyz_contract_dispute**:
@@ -153,12 +164,14 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 - Claude 3 Haiku: `Case Summary/Chronology`
 - GPT-4o-mini: `Other`
 - Llama 3.3 70B: `Case Summary/Chronology`
+- Mistral Large 2411: `Case Summary/Chronology`
 - GPT-5 (Ground Truth): `Case Summary/Chronology`
 
 **mixed_date_formats_document**:
 - Claude 3 Haiku: `Agreement/Contract`
 - GPT-4o-mini: `Agreement/Contract`
 - Llama 3.3 70B: `Other`
+- Mistral Large 2411: `Agreement/Contract`
 - GPT-5 (Ground Truth): `Case Summary/Chronology`
 
 ---
@@ -168,6 +181,7 @@ Benchmarked 4 models (2 proprietary, 2 open-source) across **22 legal documents*
 **GPT-4o-mini**: 6 documents with confidence < 0.7
 **GPT-OSS-120B**: 2 documents with confidence < 0.7
 **Llama 3.3 70B**: 1 documents with confidence < 0.7
+**Mistral Large 2411**: 4 documents with confidence < 0.7
 
 ---
 
@@ -234,36 +248,36 @@ OPENROUTER_MODEL=openai/gpt-oss-120b uv run python scripts/classify_documents.py
 See `docs/working_notes/classification-dataset-2025-10-13.md` for complete document list.
 
 ### Raw Results
-**Output Directory**: `output/classification/` (100 JSON files)
+**Output Directory**: `output/classification/` (120 JSON files)
 
 ---
 
 ## Appendix: Full Classification Matrix
 
-| Document | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B | GPT-5 (Ground Truth) |
-|----------|----------------|-------------|--------------|---------------|----------------------|
-| Affidavits_-_Amrapali | Pleading (0.85) | Pleading (0.85) | Pleading (0.93) | Pleading (0.85) | Pleading (0.90) |
-| Amarapali_-_Bank_Statement_Stamped__2nd_Buyer | Evidence/Exhibit (0.90) | Other (0.50) | Other (0.00) | Evidence/Exhibit (0.85) | Evidence/Exhibit (0.89) |
-| Amrapali_-_Agreement_To_Sell_(2nd_Sale) | Agreement/Contract (0.90) | Agreement/Contract (0.85) | Agreement/Contract (0.95) | Agreement/Contract (0.95) | Agreement/Contract (0.95) |
-| Amrapali_Allotment_Letter | Agreement/Contract (0.85) | Agreement/Contract (0.85) | Agreement/Contract (0.88) | Agreement/Contract (0.85) | Agreement/Contract (0.86) |
-| Amrapali_Builder_Buyer_Agreement | Agreement/Contract (0.90) | Agreement/Contract (0.95) | Other (0.90) | Agreement/Contract (0.95) | Agreement/Contract (0.97) |
-| Amrapali_D.D-CHEQUE_COPY | Evidence/Exhibit (0.90) | Other (0.50) | Evidence/Exhibit (0.85) | Other (0.95) | Evidence/Exhibit (0.86) |
-| Amrapali_No_Objection | Agreement/Contract (0.90) | Agreement/Contract (0.85) | Correspondence (0.85) | Agreement/Contract (0.85) | Evidence/Exhibit (0.78) |
-| Amrapali_Receipts_-_2nd_Buyer | Other (0.70) | Other (0.50) | Evidence/Exhibit (0.86) | Other (0.80) | Evidence/Exhibit (0.77) |
-| Amrapali_Reciepts__1st_Buyer | Agreement/Contract (0.80) | Other (0.50) | Evidence/Exhibit (0.85) | Agreement/Contract (0.70) | Evidence/Exhibit (0.86) |
-| Answer_to_Request_for_Arbitration | Pleading (0.90) | Pleading (0.85) | N/A | N/A | N/A |
-| Answer_to_request_for_Arbitration-_Case_Reference_... | Pleading (0.90) | Correspondence (0.85) | Correspondence (0.90) | Correspondence (0.85) | Correspondence (0.86) |
-| FAMAS_CASE_NARRATIVE_SUMMARY | Case Summary/Chronology (0.90) | Case Summary/Chronology (0.85) | Case Summary/Chronology (0.92) | Case Summary/Chronology (0.85) | Case Summary/Chronology (0.90) |
-| FaMAS_GmbH_Vs_Elcomponics_Sales_Pvt._Ltd,_O_s_Amou... | Agreement/Contract (0.85) | Correspondence (0.85) | Correspondence (0.90) | Correspondence (0.85) | Correspondence (0.93) |
-| RE__CASE_NO_2406230011_____ELCOMPONICS_SALES_PRIVA... | Correspondence (0.90) | Correspondence (0.85) | Other (0.00) | Correspondence (0.85) | Correspondence (0.92) |
-| RE__FaMAS_GmbH_Vs_Elcomponics_Sales_Pvt._Ltd,_O_s_... | Correspondence (0.90) | Correspondence (0.85) | Correspondence (0.92) | Correspondence (0.85) | Correspondence (0.90) |
-| Transaction_Fee_Invoice | Agreement/Contract (0.90) | Other (0.50) | Other (0.95) | Other (0.80) | Other (0.78) |
-| abc_xyz_contract_dispute | Agreement/Contract (0.90) | Agreement/Contract (0.95) | N/A | N/A | Case Summary/Chronology (0.88) |
-| ambiguous_dates_document | Case Summary/Chronology (0.70) | Other (0.50) | N/A | Case Summary/Chronology (0.70) | Case Summary/Chronology (0.82) |
-| clear_dates_document | Case Summary/Chronology (0.95) | Case Summary/Chronology (0.85) | N/A | Case Summary/Chronology (0.95) | Case Summary/Chronology (0.93) |
-| mixed_date_formats_document | Agreement/Contract (0.90) | Agreement/Contract (0.85) | N/A | Other (0.60) | Case Summary/Chronology (0.86) |
-| multiple_events_document | Case Summary/Chronology (0.90) | Case Summary/Chronology (0.85) | N/A | Case Summary/Chronology (0.95) | Case Summary/Chronology (0.92) |
-| no_dates_document | Other (0.70) | Other (0.70) | N/A | Other (0.85) | Other (0.90) |
+| Document | Claude 3 Haiku | GPT-4o-mini | GPT-OSS-120B | Llama 3.3 70B | Mistral Large 2411 | GPT-5 (Ground Truth) |
+|----------|----------------|-------------|--------------|---------------|--------------------|--------------------|
+| Affidavits_-_Amrapali | Pleading (0.85) | Pleading (0.85) | Pleading (0.93) | Pleading (0.85) | Pleading (0.95) | Pleading (0.90) |
+| Amarapali_-_Bank_Statement_Stamped__2nd_Buyer | Evidence/Exhibit (0.90) | Other (0.50) | Other (0.00) | Evidence/Exhibit (0.85) | Other (0.95) | Evidence/Exhibit (0.89) |
+| Amrapali_-_Agreement_To_Sell_(2nd_Sale) | Agreement/Contract (0.90) | Agreement/Contract (0.85) | Agreement/Contract (0.95) | Agreement/Contract (0.95) | Agreement/Contract (0.95) | Agreement/Contract (0.95) |
+| Amrapali_Allotment_Letter | Agreement/Contract (0.85) | Agreement/Contract (0.85) | Agreement/Contract (0.88) | Agreement/Contract (0.85) | Agreement/Contract (0.75) | Agreement/Contract (0.86) |
+| Amrapali_Builder_Buyer_Agreement | Agreement/Contract (0.90) | Agreement/Contract (0.95) | Other (0.90) | Agreement/Contract (0.95) | Agreement/Contract (0.95) | Agreement/Contract (0.97) |
+| Amrapali_D.D-CHEQUE_COPY | Evidence/Exhibit (0.90) | Other (0.50) | Evidence/Exhibit (0.85) | Other (0.95) | Other (0.95) | Evidence/Exhibit (0.86) |
+| Amrapali_No_Objection | Agreement/Contract (0.90) | Agreement/Contract (0.85) | Correspondence (0.85) | Agreement/Contract (0.85) | Agreement/Contract (0.65) | Evidence/Exhibit (0.78) |
+| Amrapali_Receipts_-_2nd_Buyer | Other (0.70) | Other (0.50) | Evidence/Exhibit (0.86) | Other (0.80) | Other (0.65) | Evidence/Exhibit (0.77) |
+| Amrapali_Reciepts__1st_Buyer | Agreement/Contract (0.80) | Other (0.50) | Evidence/Exhibit (0.85) | Agreement/Contract (0.70) | Agreement/Contract (0.65) | Evidence/Exhibit (0.86) |
+| Answer_to_Request_for_Arbitration | Pleading (0.90) | Pleading (0.85) | N/A | N/A | N/A | N/A |
+| Answer_to_request_for_Arbitration-_Case_Reference_... | Pleading (0.90) | Correspondence (0.85) | Correspondence (0.90) | Correspondence (0.85) | Correspondence (0.75) | Correspondence (0.86) |
+| FAMAS_CASE_NARRATIVE_SUMMARY | Case Summary/Chronology (0.90) | Case Summary/Chronology (0.85) | Case Summary/Chronology (0.92) | Case Summary/Chronology (0.85) | Case Summary/Chronology (0.95) | Case Summary/Chronology (0.90) |
+| FaMAS_GmbH_Vs_Elcomponics_Sales_Pvt._Ltd,_O_s_Amou... | Agreement/Contract (0.85) | Correspondence (0.85) | Correspondence (0.90) | Correspondence (0.85) | Correspondence (0.90) | Correspondence (0.93) |
+| RE__CASE_NO_2406230011_____ELCOMPONICS_SALES_PRIVA... | Correspondence (0.90) | Correspondence (0.85) | Other (0.00) | Correspondence (0.85) | Correspondence (0.95) | Correspondence (0.92) |
+| RE__FaMAS_GmbH_Vs_Elcomponics_Sales_Pvt._Ltd,_O_s_... | Correspondence (0.90) | Correspondence (0.85) | Correspondence (0.92) | Correspondence (0.85) | Correspondence (0.85) | Correspondence (0.90) |
+| Transaction_Fee_Invoice | Agreement/Contract (0.90) | Other (0.50) | Other (0.95) | Other (0.80) | Other (0.95) | Other (0.78) |
+| abc_xyz_contract_dispute | Agreement/Contract (0.90) | Agreement/Contract (0.95) | N/A | N/A | N/A | Case Summary/Chronology (0.88) |
+| ambiguous_dates_document | Case Summary/Chronology (0.70) | Other (0.50) | N/A | Case Summary/Chronology (0.70) | Case Summary/Chronology (0.65) | Case Summary/Chronology (0.82) |
+| clear_dates_document | Case Summary/Chronology (0.95) | Case Summary/Chronology (0.85) | N/A | Case Summary/Chronology (0.95) | Case Summary/Chronology (0.95) | Case Summary/Chronology (0.93) |
+| mixed_date_formats_document | Agreement/Contract (0.90) | Agreement/Contract (0.85) | N/A | Other (0.60) | Agreement/Contract (0.85) | Case Summary/Chronology (0.86) |
+| multiple_events_document | Case Summary/Chronology (0.90) | Case Summary/Chronology (0.85) | N/A | Case Summary/Chronology (0.95) | Case Summary/Chronology (0.85) | Case Summary/Chronology (0.92) |
+| no_dates_document | Other (0.70) | Other (0.70) | N/A | Other (0.85) | Other (0.95) | Other (0.90) |
 
 ---
 
