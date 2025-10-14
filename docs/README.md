@@ -29,6 +29,7 @@ The `docs/` directory serves as the central repository for:
 ### Guides
 - **[guides/provider_integration_guide.md](guides/provider_integration_guide.md)** - Step-by-step instructions for adding and validating event extractor providers.
 - **[guides/opencode_zen_troubleshooting.md](guides/opencode_zen_troubleshooting.md)** - Focused checklist to resolve empty responses and auth issues.
+- **[guides/classification-prompt-registry.md](guides/classification-prompt-registry.md)** - Comprehensive guide for using the classification prompt registry system with versioning and metadata.
 
 ### Reference
 - **[reference/configuration.md](reference/configuration.md)** - Environment variables and defaults used across providers.

@@ -39,6 +39,15 @@ from dotenv import load_dotenv  # noqa: E402
 
 from src.core.classification_prompt import build_classification_prompt  # noqa: E402
 from src.core.config import load_config  # noqa: E402
+from src.core.prompt_registry import (  # noqa: E402
+    get_prompt_text,
+    get_output_directory,
+    get_prompt_version,
+    get_prompt_for_v1_v2_flag,
+    list_prompt_variants,
+    print_all_variants,
+    print_variant_info,
+)
 
 try:
     from src.core.document_processor import DocumentProcessor  # noqa: E402
@@ -130,6 +139,27 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         default=60.0,
         help="HTTP timeout for API calls.",
     )
+    parser.add_argument(
+        "--multi-label",
+        action="store_true",
+        help="Use multi-label classification prompt (encourages multiple classes per document). Automatically routes output to classification_multilabel/ directory.",
+    )
+    parser.add_argument(
+        "--prompt-variant",
+        default=None,
+        help=f"Multi-label prompt variant. Options: {', '.join(list_prompt_variants())}, v1, v2 (backward compat). Default: 'comprehensive' (your preference). Only applies when --multi-label is used.",
+    )
+    parser.add_argument(
+        "--list-prompts",
+        action="store_true",
+        help="List all available prompt variants with descriptions and exit.",
+    )
+    parser.add_argument(
+        "--show-prompt-info",
+        type=str,
+        metavar="VARIANT",
+        help="Show detailed information about a specific prompt variant and exit.",
+    )
     return parser.parse_args(argv)
 
 
@@ -160,6 +190,35 @@ def extract_excerpt(processor: DocumentProcessor, path: Path, max_chars: int) ->
     if not text:
         raise ValueError(f"Unable to extract text from {path} using method={method}")
     return text[:max_chars].strip()
+
+
+def build_multilabel_prompt(document_title: str, document_excerpt: str, variant: Optional[str] = None) -> tuple[str, str]:
+    """
+    Build multi-label classification prompt using prompt registry.
+
+    Args:
+        document_title: Title of the document (currently unused in prompt)
+        document_excerpt: Text excerpt from document to classify
+        variant: Prompt variant name ("comprehensive", "decisive", "v1", "v2", etc.)
+                 If None, uses default from registry ("comprehensive")
+
+    Returns:
+        tuple: (system_message, user_message)
+    """
+    # Map old v1/v2 flags to new registry names for backward compatibility
+    registry_variant = get_prompt_for_v1_v2_flag(variant)
+
+    # Get prompt text from registry
+    prompt_text = get_prompt_text(registry_variant)
+
+    # Split the prompt into system and user parts
+    # The prompt format expects the document excerpt at the end after "Document Excerpt:"
+    system_message = prompt_text.split("Review the document below")[0].strip()
+    user_template = "Review the document below and return valid JSON only.\n\nDocument Excerpt:\n{excerpt}"
+
+    user_message = user_template.format(excerpt=document_excerpt.strip())
+
+    return system_message, user_message
 
 
 def parse_model_json(content: str) -> dict:
@@ -314,26 +373,43 @@ def run_classification(args: argparse.Namespace) -> List[ClassificationResult]:
     if not files:
         raise RuntimeError("No files resolved for classification.")
 
+    # Auto-route to appropriate directory when --multi-label is used
+    if args.multi_label and args.output_dir == Path("output/classification"):
+        # Use registry to get output directory
+        registry_variant = get_prompt_for_v1_v2_flag(args.prompt_variant)
+        args.output_dir = Path(get_output_directory(registry_variant))
+
     results: List[ClassificationResult] = []
 
     for path in files:
         excerpt = extract_excerpt(processor, path, args.max_chars)
-        prompt = build_classification_prompt(path.name, excerpt, prompt_version=args.prompt_version)
+
+        # Choose prompt based on --multi-label flag
+        if args.multi_label:
+            system_message, user_message = build_multilabel_prompt(path.name, excerpt, variant=args.prompt_variant)
+            # Get version from registry
+            registry_variant = get_prompt_for_v1_v2_flag(args.prompt_variant)
+            prompt_version = get_prompt_version(registry_variant)
+        else:
+            prompt = build_classification_prompt(path.name, excerpt, prompt_version=args.prompt_version)
+            system_message = prompt.system_message
+            user_message = prompt.user_message
+            prompt_version = prompt.prompt_version
 
         if args.execute:
             # Route to appropriate API based on provider
             if args.provider == "openai":
                 response, raw_response, latency = call_openai_direct(
-                    prompt.system_message,
-                    prompt.user_message,
+                    system_message,
+                    user_message,
                     model=args.model,
                     temperature=args.temperature,
                     timeout=args.timeout,
                 )
             else:  # openrouter
                 response, raw_response, latency = call_model(
-                    prompt.system_message,
-                    prompt.user_message,
+                    system_message,
+                    user_message,
                     model=args.model,
                     base_url=args.base_url,
                     temperature=args.temperature,
@@ -353,7 +429,7 @@ def run_classification(args: argparse.Namespace) -> List[ClassificationResult]:
             ClassificationResult(
                 document_path=path,
                 model=args.model,
-                prompt_version=args.prompt_version,
+                prompt_version=prompt_version,
                 response=response,
                 raw_response=raw_response,
                 api_latency_seconds=latency,
@@ -380,6 +456,21 @@ def save_results(results: Iterable[ClassificationResult], output_dir: Path) -> N
 
 def main(argv: Optional[Iterable[str]] = None) -> int:
     args = parse_args(argv)
+
+    # Handle --list-prompts flag
+    if args.list_prompts:
+        print_all_variants()
+        return 0
+
+    # Handle --show-prompt-info flag
+    if args.show_prompt_info:
+        try:
+            print_variant_info(args.show_prompt_info)
+        except KeyError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        return 0
+
     try:
         results = run_classification(args)
     except Exception as exc:  # pragma: no cover - CLI exception handling

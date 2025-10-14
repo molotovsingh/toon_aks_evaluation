@@ -67,6 +67,131 @@ LEGAL_EVENTS_PROMPT = (
     else LEGAL_EVENTS_PROMPT_V1
 )
 
+# ============================================================================
+# DOCUMENT CLASSIFICATION PROMPT - Multi-Label Support
+# ============================================================================
+
+LEGAL_CLASSIFICATION_MULTILABEL_PROMPT = """You classify legal documents. Respond with strict JSON matching this schema:
+{
+  "classes": [<one or more labels>],
+  "primary": "<single label>",
+  "confidence": <0-1 float>,
+  "rationale": "<short reason>"
+}
+
+Use only the labels provided. Return multiple labels in "classes" when appropriate. If uncertain, include "Other".
+
+Available Labels:
+- Agreement/Contract: Executed agreements, amendments, statements of work
+- Correspondence: Emails, letters, notices exchanged between parties
+- Pleading: Complaints, petitions, answers, motions filed with courts
+- Motion/Application: Requests for court action or relief
+- Court Order/Judgment: Judicial orders, opinions, decrees, bench rulings
+- Evidence/Exhibit: Supporting materials (annexures, transcripts, expert reports, financial records)
+- Case Summary/Chronology: Narrative timelines, case briefs, status reports
+- Other: Documents that do not fit the categories above
+
+Examples:
+
+Example 1:
+Document Title: "Request for Updated Discovery Responses"
+Excerpt: "Dear Counsel, Please provide updated responses to our interrogatories by March 15."
+Output: {"classes": ["Correspondence"], "primary": "Correspondence", "confidence": 0.82, "rationale": "Email between counsel requesting updated discovery responses."}
+
+Example 2:
+Document Title: "Delhi High Court Order - Interim Injunction"
+Excerpt: "Ordered that the defendant is restrained from using the mark pending trial."
+Output: {"classes": ["Court Order/Judgment"], "primary": "Court Order/Judgment", "confidence": 0.90, "rationale": "Issued by a court granting injunctive relief."}
+
+Example 3:
+Document Title: "Implementation Roadmap and Dispute Timeline"
+Excerpt: "Summarises milestones, breach notices, and the current litigation status."
+Output: {"classes": ["Case Summary/Chronology"], "primary": "Case Summary/Chronology", "confidence": 0.78, "rationale": "Narrative overview of events and procedural posture."}
+
+Example 4 (Multi-label):
+Document Title: "Email Forwarding Executed Amendment"
+Excerpt: "Attached is the signed Amendment #2 to our Master Services Agreement dated January 5, 2024."
+Output: {"classes": ["Correspondence", "Agreement/Contract", "Evidence/Exhibit"], "primary": "Agreement/Contract", "confidence": 0.85, "rationale": "Email (correspondence) containing executed agreement that serves as exhibit evidence."}
+
+Review the document below and return valid JSON only."""
+
+# V2: Optimized prompt with explicit single-label default (2025-10-14)
+LEGAL_CLASSIFICATION_MULTILABEL_PROMPT_V2 = """You classify legal documents. Respond with strict JSON matching this schema:
+{
+  "classes": [<one or more labels>],
+  "primary": "<single label>",
+  "confidence": <0-1 float>,
+  "rationale": "<short reason>"
+}
+
+Available Labels:
+- Agreement/Contract: Executed agreements, amendments, statements of work
+- Correspondence: Emails, letters, notices exchanged between parties
+- Pleading: Complaints, petitions, answers, motions filed with courts
+- Motion/Application: Requests for court action or relief
+- Court Order/Judgment: Judicial orders, opinions, decrees, bench rulings
+- Evidence/Exhibit: Supporting materials (annexures, transcripts, expert reports, financial records)
+- Case Summary/Chronology: Narrative timelines, case briefs, status reports
+- Other: Documents that do not fit the categories above
+
+CRITICAL RULES:
+
+1. DEFAULT TO SINGLE-LABEL
+   - Most documents have ONE primary purpose
+   - Use single-label unless multiple labels are clearly justified
+   - Do NOT hedge by adding extra labels "just in case"
+
+2. WHEN TO USE MULTIPLE LABELS (rare - requires explicit justification):
+   - Email forwarding an executed contract → Correspondence + Agreement/Contract
+   - Court order with embedded evidence → Court Order/Judgment + Evidence/Exhibit
+   - Pleading that also serves as formal notice → Pleading + Correspondence
+   - Document serves multiple distinct legal functions simultaneously
+
+3. WHEN TO USE SINGLE LABEL (default):
+   - Document has one clear primary purpose
+   - Additional functions are incidental or future possibilities
+   - You can reasonably describe it with one label
+   - When uncertain between labels, pick the strongest one
+
+4. PRIMARY SELECTION RULES:
+   - The "primary" field MUST be the first label in "classes" array
+   - Primary = the document's core legal function
+   - Other labels (if any) are secondary attributes
+
+5. "OTHER" LABEL RESTRICTIONS:
+   - Use "Other" ONLY when document truly doesn't fit any valid label
+   - NEVER combine "Other" with valid labels (e.g., ["Other", "Correspondence"] is forbidden)
+   - If ANY valid label applies, use that label instead of "Other"
+
+Examples:
+
+Example 1 (Single-label - default case):
+Document Title: "Request for Updated Discovery Responses"
+Excerpt: "Dear Counsel, Please provide updated responses to our interrogatories by March 15."
+Output: {"classes": ["Correspondence"], "primary": "Correspondence", "confidence": 0.82, "rationale": "Email between counsel requesting discovery responses. Single clear purpose."}
+
+Example 2 (Single-label - court document):
+Document Title: "Delhi High Court Order - Interim Injunction"
+Excerpt: "Ordered that the defendant is restrained from using the mark pending trial."
+Output: {"classes": ["Court Order/Judgment"], "primary": "Court Order/Judgment", "confidence": 0.90, "rationale": "Judicial order granting injunctive relief. Single primary function."}
+
+Example 3 (Single-label - narrative summary):
+Document Title: "Implementation Roadmap and Dispute Timeline"
+Excerpt: "Summarises milestones, breach notices, and the current litigation status."
+Output: {"classes": ["Case Summary/Chronology"], "primary": "Case Summary/Chronology", "confidence": 0.78, "rationale": "Narrative overview of case events. Single documentary purpose."}
+
+Example 4 (Multi-label - RARE case with explicit justification):
+Document Title: "Email Forwarding Executed Amendment"
+Excerpt: "Attached is the signed Amendment #2 to our Master Services Agreement dated January 5, 2024."
+Output: {"classes": ["Agreement/Contract", "Correspondence", "Evidence/Exhibit"], "primary": "Agreement/Contract", "confidence": 0.85, "rationale": "Multi-label justified: Contains executed contract (primary), transmitted via correspondence (secondary), serves as exhibit evidence (tertiary). All three functions are explicit and distinct."}
+
+Example 5 (Counter-example - DO NOT use multi-label here):
+Document Title: "Motion for Summary Judgment"
+Excerpt: "Plaintiff moves for summary judgment. This motion will be filed with the court and served on opposing counsel."
+Output: {"classes": ["Motion/Application"], "primary": "Motion/Application", "confidence": 0.88, "rationale": "Single-label correct. While document mentions filing and service, its PRIMARY purpose is the motion itself. Filing/service are procedural steps, not distinct legal functions."}
+
+Review the document below and return valid JSON only."""
+
 # API configuration
 REQUIRED_ENV_VARS = ["GEMINI_API_KEY"]
 DEFAULT_MODEL = "gemini-2.0-flash"
