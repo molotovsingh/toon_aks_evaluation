@@ -417,90 +417,11 @@ def create_pipeline_config_display(doc_extractor: str, provider: str, model: str
 
 
 # === MODEL CONFIGURATION ===
-from dataclasses import dataclass
-from typing import List
+# Import centralized model catalog
+from src.core.model_catalog import get_ui_model_config_list
 
-@dataclass
-class ModelConfig:
-    """Rich model metadata for unified selector"""
-    provider: str          # 'google', 'anthropic', 'openai', 'openrouter', 'deepseek'
-    model_id: str         # Backend model identifier
-    display_name: str     # UI display name
-    category: str         # 'Ground Truth', 'Production', 'Budget'
-    cost_per_1m: str      # '$3/M' or 'Free'
-    context_window: str   # '200K', '2M'
-    quality_score: str = ""    # '10/10', '9/10', or ''
-    badges: List[str] = None   # ['Tier 1', 'Fastest', 'Cheapest']
-
-    def __post_init__(self):
-        """Initialize default values"""
-        if self.badges is None:
-            self.badges = []
-
-    def format_inline(self) -> str:
-        """Format: Quality • Cost • Context • Badges"""
-        parts = []
-        if self.quality_score:
-            parts.append(self.quality_score)
-        parts.append(self.cost_per_1m)
-        parts.append(self.context_window)
-        if self.badges:
-            parts.extend(self.badges)
-        return ' • '.join(parts)
-
-
-# Complete model catalog across all providers
-MODEL_CATALOG = [
-    # === ANTHROPIC ===
-    ModelConfig("anthropic", "claude-sonnet-4-5", "Claude Sonnet 4.5",
-                "Ground Truth", "$3/M", "200K", "10/10", ["Tier 1", "Recommended"]),
-    ModelConfig("anthropic", "claude-opus-4", "Claude Opus 4",
-                "Ground Truth", "$15/M", "200K", "10/10", ["Tier 3", "Highest Quality"]),
-    ModelConfig("anthropic", "claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet",
-                "Production", "$3/M", "200K", "10/10", []),
-    ModelConfig("anthropic", "claude-3-haiku-20240307", "Claude 3 Haiku",
-                "Production", "$0.25/M", "200K", "10/10", ["Fastest - 4.4s"]),
-
-    # === OPENAI ===
-    ModelConfig("openai", "gpt-5", "GPT-5",
-                "Ground Truth", "$TBD", "128K", "", ["Tier 2", "Non-deterministic"]),
-    ModelConfig("openai", "gpt-4o", "GPT-4o",
-                "Production", "$2.50/M", "128K", "10/10", []),
-    ModelConfig("openai", "gpt-4o-mini", "GPT-4o Mini",
-                "Production", "$0.15/M", "128K", "9/10", []),
-
-    # === GOOGLE (maps to langextract backend) ===
-    ModelConfig("google", "gemini-2.5-pro", "Gemini 2.5 Pro",
-                "Ground Truth", "$TBD", "2M", "", ["Tier 2", "Long Docs"]),
-    ModelConfig("google", "gemini-2.0-flash", "Gemini 2.0 Flash",
-                "Production", "Free", "1M", "9/10", []),
-
-    # === OPENROUTER (18 curated models from Oct 2025 testing) ===
-    ModelConfig("openrouter", "openai/gpt-4o-mini", "GPT-4o Mini",
-                "Recommended", "$0.15/M", "128K", "9/10", ["Balanced"]),
-    ModelConfig("openrouter", "deepseek/deepseek-r1-distill-llama-70b", "DeepSeek R1 Distill",
-                "Budget", "$0.03/M", "128K", "10/10", ["Cheapest"]),
-    ModelConfig("openrouter", "qwen/qwq-32b", "Qwen QwQ 32B",
-                "Budget", "$0.115/M", "128K", "7/10", ["Ultra-cheap ⚠️"]),
-    ModelConfig("openrouter", "anthropic/claude-3-haiku", "Claude 3 Haiku",
-                "Budget", "$0.25/M", "200K", "10/10", ["4.4s ⚡"]),
-    ModelConfig("openrouter", "deepseek/deepseek-chat", "DeepSeek Chat",
-                "Budget", "$0.25/M", "128K", "10/10", ["Fast"]),
-    ModelConfig("openrouter", "anthropic/claude-3-5-sonnet", "Claude 3.5 Sonnet",
-                "Long Documents", "$3/M", "200K", "10/10", ["Max context"]),
-    ModelConfig("openrouter", "openai/gpt-4o", "GPT-4o",
-                "Maximum Quality", "$3/M", "128K", "10/10", ["OpenAI flagship"]),
-    ModelConfig("openrouter", "meta-llama/llama-3.3-70b-instruct", "Llama 3.3 70B",
-                "Open Source", "$0.60/M", "128K", "10/10", ["OSS"]),
-    ModelConfig("openrouter", "mistralai/mistral-small", "Mistral Small",
-                "Open Source", "$0.20/M", "128K", "10/10", ["EU compliance"]),
-    ModelConfig("openrouter", "openai/gpt-oss-120b", "GPT-OSS 120B",
-                "Open Source", "$0.31/M", "128K", "10/10", ["Apache 2.0", "Self-hostable"]),
-
-    # === DEEPSEEK ===
-    ModelConfig("deepseek", "deepseek-chat", "DeepSeek Chat",
-                "Production", "$0.25/M", "128K", "10/10", ["Fast"]),
-]
+# MODEL_CATALOG: Generated from centralized model catalog for backward compatibility
+MODEL_CATALOG = get_ui_model_config_list()
 
 
 def normalize_search_text(text: str) -> str:
