@@ -53,6 +53,7 @@ class DocExtractorEntry:
     enabled: bool = True  # Toggle extractor availability in UI/CLI
     prompt_id: Optional[str] = None  # Reference to named prompt in prompts module
     prompt_override: Optional[str] = None  # Inline prompt override (takes precedence over prompt_id)
+    factory_callable: Optional[str] = None  # Fully-qualified import path to factory function (e.g., "src.core.extractor_factory._create_docling_document_extractor")
 
 
 # ============================================================================
@@ -79,7 +80,8 @@ _DOC_EXTRACTOR_REGISTRY: List[DocExtractorEntry] = [
         documentation_url="https://github.com/DS4SD/docling",
         enabled=True,
         prompt_id=None,  # No prompt needed (uses Tesseract OCR)
-        prompt_override=None
+        prompt_override=None,
+        factory_callable="src.core.extractor_factory._create_docling_document_extractor"
     ),
 
     # === VISION EXTRACTORS (Paid) ===
@@ -104,7 +106,8 @@ _DOC_EXTRACTOR_REGISTRY: List[DocExtractorEntry] = [
         documentation_url="https://openrouter.ai/models/qwen/qwen3-vl-8b-instruct",
         enabled=True,
         prompt_id="qwen_vl_doc",  # References doc_extractor_prompts.QWEN_VL_DOC_PROMPT
-        prompt_override=None
+        prompt_override=None,
+        factory_callable="src.core.extractor_factory._create_qwen_vl_document_extractor"
     ),
 ]
 

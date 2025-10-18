@@ -4,6 +4,7 @@ Supports environment variable overrides for different implementations
 """
 
 import logging
+import importlib
 from typing import Tuple, Callable, Dict, Any, Optional
 
 from .interfaces import DocumentExtractor, EventExtractor
@@ -57,10 +58,67 @@ def _create_qwen_vl_document_extractor(
     return Qwen3VLDocumentExtractor(api_key=openrouter_api_key, prompt=prompt)
 
 
-DOC_PROVIDER_REGISTRY: Dict[str, Callable[[DoclingConfig, Any, ExtractorConfig], DocumentExtractor]] = {
-    "docling": _create_docling_document_extractor,
-    "qwen_vl": _create_qwen_vl_document_extractor,
-}
+# Whitelist of allowed import paths for dynamic factory loading (security)
+_FACTORY_IMPORT_WHITELIST = ["src.core"]
+
+
+def _build_doc_provider_registry() -> Dict[str, Callable[[DoclingConfig, Any, ExtractorConfig], DocumentExtractor]]:
+    """
+    Build document provider registry dynamically from catalog entries.
+
+    This function reads factory_callable strings from the catalog and dynamically
+    imports them to build the registry. Only whitelisted import paths are allowed.
+
+    Returns:
+        Dict mapping extractor_id to factory function
+    """
+    from .document_extractor_catalog import get_doc_extractor_catalog
+
+    catalog = get_doc_extractor_catalog()
+    registry = {}
+
+    # Get all enabled extractors with factory callables
+    for entry in catalog.list_extractors(enabled=True):
+        if not entry.factory_callable:
+            logger.debug(f"Skipping {entry.extractor_id}: no factory_callable defined")
+            continue
+
+        try:
+            # Security: Validate import path is whitelisted
+            module_path = entry.factory_callable.rsplit('.', 1)[0]
+            if not any(module_path.startswith(prefix) for prefix in _FACTORY_IMPORT_WHITELIST):
+                logger.warning(
+                    f"Skipping {entry.extractor_id}: factory_callable '{entry.factory_callable}' "
+                    f"not in whitelist {_FACTORY_IMPORT_WHITELIST}"
+                )
+                continue
+
+            # Dynamically import factory function
+            module_name, func_name = entry.factory_callable.rsplit('.', 1)
+            module = importlib.import_module(module_name)
+            factory_func = getattr(module, func_name)
+
+            registry[entry.extractor_id] = factory_func
+            logger.debug(f"✅ Registered {entry.extractor_id} → {entry.factory_callable}")
+
+        except (ImportError, AttributeError, ValueError) as e:
+            logger.warning(
+                f"Failed to load factory for {entry.extractor_id} "
+                f"from '{entry.factory_callable}': {e}. Skipping."
+            )
+            continue
+
+    # Fallback: Ensure Docling is available as safe default
+    if "docling" not in registry:
+        logger.warning("Docling not found in dynamic registry, adding fallback")
+        registry["docling"] = _create_docling_document_extractor
+
+    logger.info(f"🏭 Built document provider registry with {len(registry)} extractors: {list(registry.keys())}")
+    return registry
+
+
+# Build registry dynamically from catalog at module load time
+DOC_PROVIDER_REGISTRY = _build_doc_provider_registry()
 
 
 # Event Extractor Factories

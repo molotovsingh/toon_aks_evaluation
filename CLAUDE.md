@@ -175,6 +175,7 @@ DocExtractorEntry(
     enabled=True,                     # Toggle availability in UI/CLI
     prompt_id="qwen_vl_doc",         # Reference to doc_extractor_prompts.QWEN_VL_DOC_PROMPT
     prompt_override=None,             # Inline prompt (overrides prompt_id)
+    factory_callable="src.core.extractor_factory._create_qwen_vl_document_extractor",  # Factory function reference
 
     # === Metadata ===
     recommended=False,
@@ -212,17 +213,43 @@ prompt = catalog.get_prompt('qwen_vl')
 # Returns: QWEN_VL_DOC_PROMPT from doc_extractor_prompts.py
 ```
 
-**Factory Integration**:
-- Factory validates extractor exists and is enabled before creating instances
+**Factory Integration** (Dynamic Bootstrapping):
+- **DOC_PROVIDER_REGISTRY** is dynamically built from catalog at module load time
+- Factory imports factory functions from `factory_callable` string references
+- Whitelist validation: Only `src.core.*` imports allowed (security)
+- Graceful degradation: Invalid entries are logged and skipped
+- Enabled flag enforced: Disabled extractors excluded from registry
 - Prompts auto-injected from catalog into adapter constructors
 - Example: `Qwen3VLDocumentExtractor(api_key=..., prompt=catalog.get_prompt('qwen_vl'))`
 
 **Adding New Document Extractors**:
-1. Add entry to `_DOC_EXTRACTOR_REGISTRY` in `document_extractor_catalog.py`
-2. If using vision model, add prompt to `doc_extractor_prompts.py` and set `prompt_id`
-3. Create adapter implementing `DocumentExtractor` protocol
-4. Add factory function to `extractor_factory.py::DOC_PROVIDER_REGISTRY`
-5. UI/CLI automatically detect new extractor (no code changes needed)
+1. **Create adapter** in `src/core/` implementing `DocumentExtractor` protocol
+2. **Add factory function** to `extractor_factory.py`:
+   ```python
+   def _create_my_new_extractor(doc_config, _event_config, _extractor_config):
+       return MyNewExtractor(doc_config)
+   ```
+3. **Add catalog entry** to `_DOC_EXTRACTOR_REGISTRY` in `document_extractor_catalog.py`:
+   ```python
+   DocExtractorEntry(
+       extractor_id="my_new_extractor",
+       display_name="My New Extractor",
+       provider="openrouter",  # or "local", "google", etc.
+       cost_per_page=0.01,
+       cost_display="$0.15 per 15-page doc",
+       enabled=True,  # Toggle to disable
+       factory_callable="src.core.extractor_factory._create_my_new_extractor",  # NEW: Factory reference
+       prompt_id="my_extractor_prompt",  # Optional: If using custom prompt
+       # ... other metadata
+   )
+   ```
+4. **Optional: Add custom prompt** to `doc_extractor_prompts.py` if using vision model
+5. **Restart app** → UI/CLI automatically detect new extractor (no code changes needed)
+
+**Disabling Extractors**:
+- Set `enabled=False` in catalog entry → Extractor disappears from UI, CLI, and factory registry
+- No need to comment out code or edit factory map
+- Change takes effect on app restart
 
 **Current Extractors**:
 - **docling** (Local OCR): FREE, fast, production-ready, recommended for most documents

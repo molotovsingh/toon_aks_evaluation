@@ -171,14 +171,16 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         from src.core.document_extractor_catalog import get_doc_extractor_catalog
         catalog = get_doc_extractor_catalog()
         available_extractors = [e.extractor_id for e in catalog.list_extractors(enabled=True)]
-    except Exception:
-        # Fallback if catalog import fails
-        available_extractors = ["docling", "qwen_vl"]
+        if not available_extractors:
+            raise RuntimeError("No enabled document extractors found in catalog. Check document_extractor_catalog.py configuration.")
+    except Exception as e:
+        # Fatal error - catalog must be accessible
+        raise RuntimeError(f"Failed to load document extractor catalog: {e}. Cannot determine available extractors.") from e
 
     parser.add_argument(
         "--doc-extractor",
         default="docling",
-        choices=available_extractors if available_extractors else ["docling"],
+        choices=available_extractors,
         help=f"Document extractor to use for cost estimation (default: docling). Available: {', '.join(available_extractors)}. Affects Layer 1 costs in two-layer estimate.",
     )
     return parser.parse_args(argv)

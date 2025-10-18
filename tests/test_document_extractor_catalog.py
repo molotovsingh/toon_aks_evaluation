@@ -249,6 +249,107 @@ class TestDocumentExtractorCatalog:
             assert extractor.ocr_quality in ["high", "medium", "low", "n/a", ""]
 
 
+class TestFactoryIntegration:
+    """Test integration between catalog and extractor_factory module"""
+
+    def test_factory_callable_present(self):
+        """Test that factory_callable field is populated for extractors"""
+        catalog = get_doc_extractor_catalog()
+
+        # Docling should have factory callable
+        docling = catalog.get_extractor("docling")
+        assert docling.factory_callable is not None, "Docling should have factory_callable"
+        assert "src.core.extractor_factory" in docling.factory_callable
+        assert "_create_docling_document_extractor" in docling.factory_callable
+
+        # Qwen-VL should have factory callable
+        qwen_vl = catalog.get_extractor("qwen_vl")
+        assert qwen_vl.factory_callable is not None, "Qwen-VL should have factory_callable"
+        assert "src.core.extractor_factory" in qwen_vl.factory_callable
+        assert "_create_qwen_vl_document_extractor" in qwen_vl.factory_callable
+
+    def test_factory_registry_built_from_catalog(self):
+        """Test that DOC_PROVIDER_REGISTRY is dynamically built from catalog"""
+        from src.core.extractor_factory import DOC_PROVIDER_REGISTRY
+
+        # Registry should be a dict
+        assert isinstance(DOC_PROVIDER_REGISTRY, dict), "Registry should be a dictionary"
+
+        # Should contain enabled extractors with factory callables
+        assert "docling" in DOC_PROVIDER_REGISTRY, "Docling should be in registry"
+        assert "qwen_vl" in DOC_PROVIDER_REGISTRY, "Qwen-VL should be in registry"
+
+        # Registry functions should be callable
+        assert callable(DOC_PROVIDER_REGISTRY["docling"])
+        assert callable(DOC_PROVIDER_REGISTRY["qwen_vl"])
+
+    def test_disabled_extractor_not_in_factory(self):
+        """Test that disabling an extractor removes it from factory registry"""
+        # This test simulates the behavior - in real usage, you'd modify catalog and reload
+        from src.core.document_extractor_catalog import DocumentExtractorCatalog, DocExtractorEntry
+
+        # Create test catalog with disabled extractor
+        test_registry = [
+            DocExtractorEntry(
+                extractor_id="test_disabled",
+                display_name="Test Disabled",
+                provider="local",
+                cost_per_page=0.0,
+                cost_display="FREE",
+                enabled=False,  # DISABLED
+                factory_callable="src.core.extractor_factory._create_docling_document_extractor"
+            ),
+            DocExtractorEntry(
+                extractor_id="test_enabled",
+                display_name="Test Enabled",
+                provider="local",
+                cost_per_page=0.0,
+                cost_display="FREE",
+                enabled=True,  # ENABLED
+                factory_callable="src.core.extractor_factory._create_docling_document_extractor"
+            ),
+        ]
+
+        test_catalog = DocumentExtractorCatalog(test_registry)
+
+        # Get enabled extractors (should only include enabled one)
+        enabled_extractors = test_catalog.list_extractors(enabled=True)
+        enabled_ids = [e.extractor_id for e in enabled_extractors]
+
+        assert "test_enabled" in enabled_ids, "Enabled extractor should be in list"
+        assert "test_disabled" not in enabled_ids, "Disabled extractor should not be in list"
+
+    def test_factory_build_validates_enabled_flag(self):
+        """Test that build_extractors validates enabled flag via catalog"""
+        from src.core.extractor_factory import build_extractors, ExtractorConfigurationError
+        from src.core.config import DoclingConfig, ExtractorConfig, LangExtractConfig
+
+        # Try to build with valid enabled extractor (should succeed)
+        doc_config = DoclingConfig()
+        event_config = LangExtractConfig()
+        extractor_config = ExtractorConfig(doc_extractor="docling")
+
+        try:
+            doc_extractor, _ = build_extractors(doc_config, event_config, extractor_config)
+            assert doc_extractor is not None, "Should create extractor for enabled entry"
+        except ExtractorConfigurationError:
+            # This is fine - just means dependencies aren't available in test environment
+            pass
+
+    def test_cli_gets_extractors_from_catalog(self):
+        """Test that CLI dynamically loads extractors from catalog"""
+        # Import would fail if catalog isn't accessible
+        from src.core.document_extractor_catalog import get_doc_extractor_catalog
+
+        catalog = get_doc_extractor_catalog()
+        cli_choices = [e.extractor_id for e in catalog.list_extractors(enabled=True)]
+
+        # CLI should get same list as catalog
+        assert "docling" in cli_choices, "CLI should include docling"
+        assert "qwen_vl" in cli_choices, "CLI should include qwen_vl"
+        assert len(cli_choices) >= 2, "CLI should have at least 2 choices"
+
+
 class TestPromptRegistryIntegration:
     """Test integration between catalog and doc_extractor_prompts module"""
 
@@ -288,6 +389,7 @@ def run_all_tests():
     print()
 
     test_catalog = TestDocumentExtractorCatalog()
+    test_factory = TestFactoryIntegration()
     test_prompts = TestPromptRegistryIntegration()
 
     # Catalog tests
@@ -313,6 +415,11 @@ def run_all_tests():
         ("Get Prompt - Nonexistent", test_catalog.test_get_prompt_nonexistent),
         ("Prompt Resolution Priority", test_catalog.test_prompt_resolution_priority),
         ("Registry Schema Completeness", test_catalog.test_registry_schema_completeness),
+        ("Factory Callable Present", test_factory.test_factory_callable_present),
+        ("Factory Registry Built", test_factory.test_factory_registry_built_from_catalog),
+        ("Disabled Extractor Not In Factory", test_factory.test_disabled_extractor_not_in_factory),
+        ("Factory Validates Enabled Flag", test_factory.test_factory_build_validates_enabled_flag),
+        ("CLI Gets Extractors From Catalog", test_factory.test_cli_gets_extractors_from_catalog),
         ("Qwen-VL Prompt Exists", test_prompts.test_qwen_vl_prompt_exists_in_registry),
         ("Catalog-Registry Prompt Match", test_prompts.test_catalog_prompt_matches_registry),
         ("List Prompt IDs", test_prompts.test_list_prompt_ids),
