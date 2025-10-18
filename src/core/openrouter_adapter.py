@@ -223,6 +223,9 @@ class OpenRouterEventExtractor:
                 logger.warning("⚠️ No content in OpenRouter response")
                 return []
 
+            # Log first 500 chars of raw response for debugging
+            logger.info(f"📝 OpenRouter raw response preview: {content[:500]}...")
+
             # Strip markdown code block wrappers if present (common in prompt-based JSON)
             content = content.strip()
             if content.startswith("```json"):
@@ -236,8 +239,15 @@ class OpenRouterEventExtractor:
             # Parse JSON content
             try:
                 events_data = json.loads(content)
-            except json.JSONDecodeError:
-                logger.warning("⚠️ Failed to parse JSON from OpenRouter response content")
+            except json.JSONDecodeError as json_err:
+                logger.warning(f"⚠️ Failed to parse JSON from OpenRouter response: {json_err}")
+                logger.info(f"📝 Unparseable content (first 300 chars): {content[:300]}")
+
+                # Try fallback parsing before giving up
+                fallback_events = self._fallback_event_parser(content, document_name)
+                if fallback_events:
+                    return fallback_events
+
                 return []
 
             # Handle both array and object responses
@@ -264,6 +274,7 @@ class OpenRouterEventExtractor:
                 # Extract required fields with defaults
                 event_particulars = event_data.get("event_particulars", "")
                 if not event_particulars:
+                    logger.info(f"ℹ️  Skipping event #{i} - missing event_particulars. Keys present: {list(event_data.keys())}")
                     continue  # Skip events without particulars
 
                 # Create EventRecord with OpenRouter-specific attributes
@@ -288,6 +299,87 @@ class OpenRouterEventExtractor:
         except Exception as e:
             logger.error(f"❌ Failed to parse OpenRouter response: {e}")
             return []
+
+    def _fallback_event_parser(self, content: str, document_name: str) -> List[EventRecord]:
+        """
+        Attempt alternative parsing strategies when primary JSON parsing fails
+
+        Handles:
+        - Non-JSON responses (plain text descriptions)
+        - Markdown-formatted responses
+        - Partial JSON responses buried in text
+
+        Args:
+            content: Raw response content from OpenRouter
+            document_name: Source document name
+
+        Returns:
+            List of EventRecord instances (may be empty if all strategies fail)
+        """
+        import re
+
+        logger.info("🔄 Attempting fallback parsing strategies...")
+
+        # Strategy 1: Look for JSON anywhere in the response (even if wrapped in text)
+        json_match = re.search(r'\{.*\}|\[.*\]', content, re.DOTALL)
+        if json_match:
+            try:
+                events_data = json.loads(json_match.group(0))
+                logger.info("✅ Fallback: Found JSON via regex extraction")
+
+                # Reuse existing logic for handling dict/list responses
+                if isinstance(events_data, dict):
+                    if "events" in events_data:
+                        events_data = events_data["events"]
+                    elif "extractions" in events_data:
+                        events_data = events_data["extractions"]
+                    else:
+                        events_data = [events_data]
+
+                if isinstance(events_data, list):
+                    # Try to convert to EventRecords
+                    event_records = []
+                    for i, event_data in enumerate(events_data, 1):
+                        if isinstance(event_data, dict) and event_data.get("event_particulars"):
+                            attributes = {
+                                "provider": "openrouter",
+                                "model": self.config.active_model,
+                                "parsing_strategy": "fallback_regex_json",
+                                "original_response": event_data
+                            }
+                            event_record = EventRecord(
+                                number=i,
+                                date=event_data.get("date", DEFAULT_NO_DATE),
+                                event_particulars=event_data.get("event_particulars"),
+                                citation=event_data.get("citation", DEFAULT_NO_CITATION),
+                                document_reference=document_name,
+                                attributes=attributes
+                            )
+                            event_records.append(event_record)
+
+                    if event_records:
+                        logger.info(f"✅ Fallback extracted {len(event_records)} events via regex JSON")
+                        return event_records
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                logger.info(f"ℹ️  Regex JSON strategy failed: {e}")
+
+        # Strategy 2: Parse as plain text and create single event from response
+        logger.warning("⚠️ All parsing strategies failed - creating single event from response text")
+        truncated_content = content[:500] if len(content) > 500 else content
+
+        return [EventRecord(
+            number=1,
+            date=DEFAULT_NO_DATE,
+            event_particulars=f"OpenRouter response (non-standard format): {truncated_content}",
+            citation=DEFAULT_NO_CITATION,
+            document_reference=document_name,
+            attributes={
+                "provider": "openrouter",
+                "model": self.config.active_model,
+                "parsing_strategy": "fallback_text_extraction",
+                "original_content_length": len(content)
+            }
+        )]
 
     def _create_fallback_record(self, document_name: str, reason: str) -> EventRecord:
         """
