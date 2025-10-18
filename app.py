@@ -312,16 +312,25 @@ def create_pipeline_status(doc_extractor: str, provider: str, model: str = None)
     Document Processing → Event Extraction → Model Selection
 
     Args:
-        doc_extractor: 'docling' or 'gemini'
+        doc_extractor: extractor_id from catalog (e.g., 'docling', 'qwen_vl')
         provider: 'openrouter', 'langextract', 'openai', 'anthropic', 'deepseek', 'opencode_zen'
         model: Selected model identifier (optional)
     """
-    # Stage 1: Document Processing
-    doc_display_map = {
-        'docling': '🔧 Docling<br><span style="font-size:0.63rem;">Local OCR</span>',
-        'gemini': '🌟 Gemini 2.5<br><span style="font-size:0.63rem;">Cloud Vision</span>'
-    }
-    doc_display = doc_display_map.get(doc_extractor, doc_extractor)
+    # Stage 1: Document Processing (dynamically loaded from catalog)
+    from src.core.document_extractor_catalog import get_doc_extractor_catalog
+    catalog = get_doc_extractor_catalog()
+    doc_entry = catalog.get_extractor(doc_extractor)
+
+    if doc_entry:
+        # Use catalog metadata for display
+        emoji = "🔧" if doc_entry.provider == "local" else "👁️"
+        # Extract short name (e.g., "Docling" from "Docling (Local OCR)")
+        short_name = doc_entry.display_name.split('(')[0].strip()
+        provider_label = doc_entry.provider.title() if doc_entry.provider != "local" else "Local OCR"
+        doc_display = f'{emoji} {short_name}<br><span style="font-size:0.63rem;">{provider_label}</span>'
+    else:
+        # Fallback if extractor not in catalog
+        doc_display = doc_extractor
 
     # Stage 2: Event Extraction Provider
     provider_display_map = {
@@ -378,7 +387,7 @@ def create_pipeline_config_display(doc_extractor: str, provider: str, model: str
     Useful for debugging, sharing configurations, and validating selections.
 
     Args:
-        doc_extractor: 'docling' or 'gemini'
+        doc_extractor: 'docling' or 'qwen_vl'
         provider: 'openrouter', 'langextract', 'openai', 'anthropic', 'deepseek', 'opencode_zen'
         model: Selected model identifier (optional)
     """
@@ -922,38 +931,54 @@ def create_openrouter_model_selector():
 
 
 def create_doc_extractor_selection():
-    """Create document extractor selection UI"""
+    """Create document extractor selection UI (dynamically generated from registry)"""
     st.markdown('<div class="section-header">📄 Document Processing</div>', unsafe_allow_html=True)
+
+    # Import catalog
+    from src.core.document_extractor_catalog import get_doc_extractor_catalog
 
     # Initialize session state for document extractor
     default_doc_extractor = os.getenv('DOC_EXTRACTOR', 'docling').lower()
     if 'selected_doc_extractor' not in st.session_state:
         st.session_state.selected_doc_extractor = default_doc_extractor
 
-    # Check if Gemini API key is configured
-    gemini_configured = bool(os.getenv('GEMINI_API_KEY'))
+    # Get enabled extractors from catalog
+    catalog = get_doc_extractor_catalog()
+    enabled_extractors = catalog.list_extractors(enabled=True)
 
-    # Document extractor options with cost/speed info
-    doc_options = {
-        'docling': {
-            'name': '🔧 Docling (Local Processing)',
-            'subtitle': 'FREE • Fast • OCR-Ready',
-            'description': '✅ Production-ready, Tesseract OCR, 2-22s per doc'
-        },
-        'gemini': {
-            'name': '🌟 Gemini 2.5 (Cloud Vision)',
-            'subtitle': 'Premium • Multimodal • 4.5x cost',
-            'description': '🧪 Experimental, Native PDF vision, ~$0.0014 per doc' if gemini_configured else '⚠️ Requires GEMINI_API_KEY'
+    if not enabled_extractors:
+        st.error("❌ No document extractors available. Check catalog configuration.")
+        return default_doc_extractor
+
+    # Build options dynamically from catalog
+    doc_options = {}
+    for extractor in enabled_extractors:
+        # Check if API key required (for paid extractors)
+        requires_api_key = extractor.cost_per_page > 0
+        api_key_configured = bool(os.getenv('OPENROUTER_API_KEY')) if extractor.provider == 'openrouter' else True
+
+        # Build display info
+        emoji = "🔧" if extractor.provider == "local" else "👁️"
+        doc_options[extractor.extractor_id] = {
+            'name': f'{emoji} {extractor.display_name}',
+            'subtitle': extractor.cost_display + (' • ' + extractor.processing_speed.title() if extractor.processing_speed else ''),
+            'description': extractor.notes if api_key_configured else f'⚠️ Requires API key for {extractor.provider}'
         }
-    }
+
+    # Get current index for radio button
+    options_list = [e.extractor_id for e in enabled_extractors]
+    try:
+        current_index = options_list.index(st.session_state.selected_doc_extractor)
+    except ValueError:
+        current_index = 0
 
     # Radio button for document extractor selection
     selected_doc_extractor = st.radio(
         "Choose document processor:",
-        options=['docling', 'gemini'],
+        options=options_list,
         format_func=lambda x: doc_options[x]['name'],
-        index=0 if st.session_state.selected_doc_extractor == 'docling' else 1,
-        help="Docling: Local OCR processing (FREE). Gemini: Cloud multimodal vision (premium quality, higher cost)"
+        index=current_index,
+        help="Select document extraction engine. Local extractors are free, vision extractors offer better quality for poor scans."
     )
 
     # Show subtitle and description for selected option
@@ -961,9 +986,11 @@ def create_doc_extractor_selection():
     st.caption(f"{option_info['subtitle']}")
     st.caption(f"ℹ️ {option_info['description']}")
 
-    # Warn if Gemini selected but not configured
-    if selected_doc_extractor == 'gemini' and not gemini_configured:
-        st.warning("⚠️ **Gemini API Key Required**: Set `GEMINI_API_KEY` in your `.env` file to use Gemini document extraction.")
+    # Warn if paid extractor selected but not configured
+    selected_entry = catalog.get_extractor(selected_doc_extractor)
+    if selected_entry and selected_entry.cost_per_page > 0:
+        if selected_entry.provider == 'openrouter' and not os.getenv('OPENROUTER_API_KEY'):
+            st.warning("⚠️ **OpenRouter API Key Required**: Set `OPENROUTER_API_KEY` in your `.env` file to use this vision extractor.")
 
     # Update session state and clear cache if changed
     if selected_doc_extractor != st.session_state.selected_doc_extractor:
@@ -1289,7 +1316,7 @@ def main():
 
     # Header
     st.markdown('<h1 class="main-header">Legal Events Extraction</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="main-caption">Document processing with flexible extractors (Docling/Gemini + AI providers)</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-caption">Document processing with flexible extractors (Docling/Qwen-VL + AI providers)</p>', unsafe_allow_html=True)
 
     # Main content area
     col1, col2 = st.columns([2, 1])
@@ -1338,7 +1365,7 @@ def main():
         st.markdown('<div class="section-header">⚡ Quick Test</div>', unsafe_allow_html=True)
         if st.button("📄 Try Sample Document", width="stretch", help="Load the Famas arbitration PDF for testing"):
             from pathlib import Path
-            sample_path = Path("sample_pdf/famas_dispute/testfile.pdf")
+            sample_path = Path("sample_pdf/famas_dispute/Transaction_Fee_Invoice.pdf")
 
             if sample_path.exists():
                 # Store sample file info in session state
@@ -1355,7 +1382,7 @@ def main():
         # Handle sample document if requested
         if st.session_state.get('use_sample', False) and not uploaded_files:
             from pathlib import Path
-            sample_path = Path("sample_pdf/famas_dispute/testfile.pdf")
+            sample_path = Path("sample_pdf/famas_dispute/Transaction_Fee_Invoice.pdf")
 
             if sample_path.exists():
                 # Read sample file and create a file-like object
@@ -1363,10 +1390,25 @@ def main():
                 sample_bytes = sample_path.read_bytes()
                 sample_file = io.BytesIO(sample_bytes)
                 sample_file.name = sample_path.name
+                sample_file.seek(0)  # Reset position to start for subsequent reads
                 files_to_process = [sample_file]
-                st.info(f"📄 Ready to process: **{sample_path.name}** (930 KB)")
+                st.info(f"📄 Ready to process: **{sample_path.name}** ({len(sample_bytes) / 1024:.0f} KB)")
 
         if files_to_process:
+            # Show cost estimate WITHOUT extraction (uses page count estimation)
+            from src.ui.streamlit_common import display_cost_estimates
+
+            # Show cost estimates WITHOUT running extraction
+            # display_cost_estimates handles extracted_texts=None by using page count heuristics
+            display_cost_estimates(
+                extracted_texts=None,  # Don't extract yet - show estimate first
+                provider=selected_provider,
+                runtime_model=selected_model,
+                show_all_models=False,  # Show specific model estimate only
+                uploaded_files=files_to_process,  # For Layer 1 cost calculation
+                doc_extractor=selected_doc_extractor  # For Layer 1 cost calculation
+            )
+
             if st.button("Process Files", type="primary", width="stretch"):
                 # Enhanced status container with context
                 status_container = st.empty()

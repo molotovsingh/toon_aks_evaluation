@@ -48,6 +48,7 @@ from src.core.prompt_registry import (  # noqa: E402
     print_all_variants,
     print_variant_info,
 )
+from src.ui.cost_estimator import estimate_cost, estimate_tokens  # noqa: E402
 
 try:
     from src.core.document_processor import DocumentProcessor  # noqa: E402
@@ -159,6 +160,26 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         type=str,
         metavar="VARIANT",
         help="Show detailed information about a specific prompt variant and exit.",
+    )
+    parser.add_argument(
+        "--estimate-only",
+        action="store_true",
+        help="Show cost estimates for processing documents without making API calls.",
+    )
+    # Get available extractors from catalog (dynamically loaded)
+    try:
+        from src.core.document_extractor_catalog import get_doc_extractor_catalog
+        catalog = get_doc_extractor_catalog()
+        available_extractors = [e.extractor_id for e in catalog.list_extractors(enabled=True)]
+    except Exception:
+        # Fallback if catalog import fails
+        available_extractors = ["docling", "qwen_vl"]
+
+    parser.add_argument(
+        "--doc-extractor",
+        default="docling",
+        choices=available_extractors if available_extractors else ["docling"],
+        help=f"Document extractor to use for cost estimation (default: docling). Available: {', '.join(available_extractors)}. Affects Layer 1 costs in two-layer estimate.",
     )
     return parser.parse_args(argv)
 
@@ -365,6 +386,74 @@ def call_openai_direct(
         raise RuntimeError(f"OpenAI API call failed: {e}") from e
 
 
+def print_cost_estimates(files: List[Path], excerpts: List[str], model: str, doc_extractor: str = "docling") -> None:
+    """
+    Print two-layer cost estimates for processing documents.
+
+    Args:
+        files: List of file paths being processed
+        excerpts: List of text excerpts extracted from files (can be None for pre-extraction estimate)
+        model: Model identifier to estimate costs for
+        doc_extractor: Document extractor ID ('docling', 'qwen_vl', 'gemini')
+    """
+    from src.ui.cost_estimator import estimate_cost_two_layer  # noqa: E402
+
+    print("\n" + "=" * 80)
+    print("TWO-LAYER COST ESTIMATES (Document + Event Extraction)")
+    print("=" * 80)
+    print(f"\nEstimation method:")
+    print(f"  Layer 1 (Doc Extraction): Page count metadata (no paid extraction run)")
+    print(f"  Layer 2 (Event Extraction): 4 chars = 1 token (±20% accuracy)")
+    print(f"  Token split assumption: 90% input, 10% output\n")
+
+    # Get two-layer cost estimate
+    two_layer_result = estimate_cost_two_layer(
+        uploaded_files=files,
+        doc_extractor=doc_extractor,
+        event_model=model,
+        extracted_texts=excerpts  # Can be None - will use page count heuristic
+    )
+
+    print(f"Total documents: {len(files)}")
+    print(f"Total pages: {two_layer_result['page_count']} (confidence: {two_layer_result['page_confidence']})")
+    print(f"Document extractor: {doc_extractor}")
+    print(f"Event extraction model: {model}")
+
+    # Print results in table format
+    print("\n" + "-" * 80)
+    print(f"{'Layer / Metric':<40} {'Value':>20}")
+    print("-" * 80)
+
+    # Layer 1: Document Extraction
+    print(f"{'LAYER 1: Document Extraction':<40} {''}")
+    print(f"{'  Pages processed':<40} {two_layer_result['page_count']:>20,}")
+    print(f"{'  Extractor':<40} {two_layer_result['document_extractor']:>20}")
+    print(f"{'  Cost':<40} {two_layer_result['document_cost_display']:>20}")
+
+    # Layer 2: Event Extraction
+    print(f"{'LAYER 2: Event Extraction':<40} {''}")
+    print(f"{'  Total tokens':<40} {two_layer_result['tokens_total']:>20,}")
+    print(f"{'  Input tokens (90%)':<40} {two_layer_result['tokens_input']:>20,}")
+    print(f"{'  Output tokens (10%)':<40} {two_layer_result['tokens_output']:>20,}")
+    print(f"{'  Model':<40} {two_layer_result['event_model']:>20}")
+    print(f"{'  Cost':<40} {two_layer_result['event_cost_display']:>20}")
+
+    # Total
+    print("-" * 80)
+    if two_layer_result['pricing_available']:
+        print(f"{'TOTAL ESTIMATED COST':<40} {two_layer_result['total_cost_display']:>20}")
+    else:
+        print(f"{'TOTAL ESTIMATED COST':<40} {'Pricing unavailable':>20}")
+    print("-" * 80)
+
+    if two_layer_result['pricing_available']:
+        print(f"\nNote: {two_layer_result['note']}")
+    else:
+        print(f"\nNote: Pricing unavailable for one or more layers")
+
+    print("=" * 80 + "\n")
+
+
 def run_classification(args: argparse.Namespace) -> List[ClassificationResult]:
     load_dotenv()
     docling_config, _, _ = load_config()
@@ -379,10 +468,21 @@ def run_classification(args: argparse.Namespace) -> List[ClassificationResult]:
         registry_variant = get_prompt_for_v1_v2_flag(args.prompt_variant)
         args.output_dir = Path(get_output_directory(registry_variant))
 
-    results: List[ClassificationResult] = []
-
+    # Extract all excerpts first (needed for both estimation and processing)
+    excerpts = []
     for path in files:
         excerpt = extract_excerpt(processor, path, args.max_chars)
+        excerpts.append(excerpt)
+
+    # If --estimate-only is set, show cost estimates and exit
+    if args.estimate_only:
+        print_cost_estimates(files, excerpts, args.model, args.doc_extractor)
+        return []  # Return empty list since no classification was performed
+
+    results: List[ClassificationResult] = []
+
+    for idx, path in enumerate(files):
+        excerpt = excerpts[idx]  # Use pre-extracted excerpt
 
         # Choose prompt based on --multi-label flag
         if args.multi_label:
@@ -476,6 +576,11 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     except Exception as exc:  # pragma: no cover - CLI exception handling
         print(f"Error: {exc}", file=sys.stderr)
         return 1
+
+    # If --estimate-only was used, results will be empty
+    if args.estimate_only:
+        print("Cost estimation completed. Use without --estimate-only to run classification.")
+        return 0
 
     save_results(results, args.output_dir)
 

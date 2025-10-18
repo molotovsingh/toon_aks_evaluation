@@ -175,23 +175,6 @@ class DeepSeekConfig:
 
 
 @dataclass
-class GeminiDocConfig:
-    """Configuration for Gemini Document Extractor (alternative to Docling)
-
-    Uses Gemini 2.5's native multimodal vision to process PDFs directly,
-    skipping the Docling text extraction step.
-    """
-
-    # API settings
-    api_key: str = field(default_factory=lambda: env_str("GEMINI_API_KEY", ""))
-    model_id: str = field(default_factory=lambda: env_str("GEMINI_DOC_MODEL_ID", "gemini-2.5-flash"))
-
-    # File constraints
-    max_file_size_mb: int = 50  # Gemini File API limit
-    timeout: int = field(default_factory=lambda: env_int("GEMINI_DOC_TIMEOUT", 120))
-
-
-@dataclass
 class ExtractorConfig:
     """Configuration for extractor selection"""
 

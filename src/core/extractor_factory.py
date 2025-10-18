@@ -8,12 +8,12 @@ from typing import Tuple, Callable, Dict, Any, Optional
 
 from .interfaces import DocumentExtractor, EventExtractor
 from .config import (
-    DoclingConfig, LangExtractConfig, ExtractorConfig, GeminiDocConfig,
+    DoclingConfig, LangExtractConfig, ExtractorConfig,
     OpenRouterConfig, OpenCodeZenConfig, OpenAIConfig, AnthropicConfig, DeepSeekConfig,
     load_config, load_provider_config
 )
 from .docling_adapter import DoclingDocumentExtractor
-from .gemini_doc_extractor import GeminiDocumentExtractor
+from .qwen_vl_doc_adapter import Qwen3VLDocumentExtractor
 from .langextract_adapter import LangExtractEventExtractor
 from .openrouter_adapter import OpenRouterEventExtractor
 from .opencode_zen_adapter import OpenCodeZenEventExtractor
@@ -39,19 +39,27 @@ def _create_docling_document_extractor(
     return DoclingDocumentExtractor(doc_config)
 
 
-def _create_gemini_document_extractor(
+def _create_qwen_vl_document_extractor(
     _doc_config: DoclingConfig,
     _event_config: Any,
     _extractor_config: ExtractorConfig
 ) -> DocumentExtractor:
-    """Factory for the Gemini document extractor (cloud multimodal vision)."""
-    gemini_config = GeminiDocConfig()
-    return GeminiDocumentExtractor(gemini_config)
+    """Factory for the Qwen3-VL document extractor (budget vision via OpenRouter)."""
+    import os
+    from .document_extractor_catalog import get_doc_extractor_catalog
+
+    openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
+
+    # Inject prompt from catalog if configured
+    catalog = get_doc_extractor_catalog()
+    prompt = catalog.get_prompt("qwen_vl")
+
+    return Qwen3VLDocumentExtractor(api_key=openrouter_api_key, prompt=prompt)
 
 
 DOC_PROVIDER_REGISTRY: Dict[str, Callable[[DoclingConfig, Any, ExtractorConfig], DocumentExtractor]] = {
     "docling": _create_docling_document_extractor,
-    "gemini": _create_gemini_document_extractor,
+    "qwen_vl": _create_qwen_vl_document_extractor,
 }
 
 
@@ -146,6 +154,28 @@ def build_extractors(
     event_extractor_type = extractor_config.event_extractor.lower()
 
     logger.info(f"🏭 Building extractors: DOC={doc_extractor_type}, EVENT={event_extractor_type}")
+
+    # Validate document extractor exists in catalog and is enabled
+    from .document_extractor_catalog import get_doc_extractor_catalog
+    catalog = get_doc_extractor_catalog()
+    catalog_entry = catalog.get_extractor(doc_extractor_type)
+
+    if not catalog_entry:
+        available_ids = catalog.get_all_extractor_ids()
+        available = ", ".join(sorted(available_ids)) or "none"
+        logger.error(f"❌ Document extractor '{doc_extractor_type}' not found in catalog")
+        raise ExtractorConfigurationError(
+            f"Document extractor '{doc_extractor_type}' not found in catalog. Available extractors: {available}"
+        )
+
+    if not catalog_entry.enabled:
+        logger.error(f"❌ Document extractor '{doc_extractor_type}' is disabled in catalog")
+        raise ExtractorConfigurationError(
+            f"Document extractor '{doc_extractor_type}' is disabled in catalog. "
+            f"Enable it in document_extractor_catalog.py or choose a different extractor."
+        )
+
+    logger.info(f"✅ Catalog validated: {catalog_entry.display_name} (enabled)")
 
     # Create document extractor
     doc_factory = DOC_PROVIDER_REGISTRY.get(doc_extractor_type)

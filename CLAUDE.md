@@ -140,6 +140,94 @@ To add a new provider:
 3. Add config dataclass to `config.py`
 4. Update `load_provider_config()` to handle new provider type
 
+### Document Extractor Catalog
+
+The system uses a **centralized catalog** for Layer 1 document extraction configuration in `document_extractor_catalog.py`:
+
+**Purpose**: Single source of truth for document extractor metadata (pricing, capabilities, prompts, availability)
+
+**Key Features**:
+- **Pricing Metadata**: Cost per page, display strings for UI cost estimation
+- **Capability Flags**: PDF/DOCX/image support, vision capabilities, OCR quality
+- **Prompt Management**: Named prompts in `doc_extractor_prompts.py` with inline override support
+- **Enabled Toggle**: Control extractor availability without code changes
+- **Dynamic UI/CLI**: Options auto-generated from `catalog.list_extractors(enabled=True)`
+
+**Catalog Entry Schema** (`DocExtractorEntry`):
+```python
+DocExtractorEntry(
+    # === Identification ===
+    extractor_id="qwen_vl",           # Unique identifier
+    display_name="Qwen3-VL (Budget Vision)",
+    provider="openrouter",            # 'local', 'openrouter', 'google'
+
+    # === Pricing (Layer 1) ===
+    cost_per_page=0.00512,            # USD per page/image
+    cost_display="$0.077 per 15-page doc",
+
+    # === Capabilities ===
+    supports_pdf=True,
+    supports_vision=True,             # Multimodal understanding
+    processing_speed="medium",        # 'fast', 'medium', 'slow'
+    ocr_quality="high",               # 'high', 'medium', 'low', 'n/a'
+
+    # === Registry Control ===
+    enabled=True,                     # Toggle availability in UI/CLI
+    prompt_id="qwen_vl_doc",         # Reference to doc_extractor_prompts.QWEN_VL_DOC_PROMPT
+    prompt_override=None,             # Inline prompt (overrides prompt_id)
+
+    # === Metadata ===
+    recommended=False,
+    notes="Budget vision API for multimodal parsing. Use when Docling OCR fails.",
+    documentation_url="https://openrouter.ai/models/qwen/qwen3-vl-8b-instruct"
+)
+```
+
+**Prompt Resolution Priority**:
+1. `prompt_override` (inline override if specified)
+2. `prompt_id` (lookup in `doc_extractor_prompts.py`)
+3. `None` (extractor uses default behavior)
+
+**Usage Examples**:
+```python
+# Get catalog instance
+from src.core.document_extractor_catalog import get_doc_extractor_catalog
+catalog = get_doc_extractor_catalog()
+
+# Query extractors
+enabled_extractors = catalog.list_extractors(enabled=True)
+vision_extractors = catalog.list_extractors(supports_vision=True)
+free_extractors = catalog.list_extractors(free_only=True)
+
+# Get pricing for cost estimation
+pricing = catalog.get_pricing('qwen_vl')
+# Returns: {'cost_per_page': 0.00512, 'cost_display': '$0.077 per 15-page doc'}
+
+# Estimate extraction cost
+cost_estimate = catalog.estimate_cost('qwen_vl', page_count=15)
+# Returns: {'cost_usd': 0.0768, 'cost_display': '$0.0768', ...}
+
+# Get extractor prompt
+prompt = catalog.get_prompt('qwen_vl')
+# Returns: QWEN_VL_DOC_PROMPT from doc_extractor_prompts.py
+```
+
+**Factory Integration**:
+- Factory validates extractor exists and is enabled before creating instances
+- Prompts auto-injected from catalog into adapter constructors
+- Example: `Qwen3VLDocumentExtractor(api_key=..., prompt=catalog.get_prompt('qwen_vl'))`
+
+**Adding New Document Extractors**:
+1. Add entry to `_DOC_EXTRACTOR_REGISTRY` in `document_extractor_catalog.py`
+2. If using vision model, add prompt to `doc_extractor_prompts.py` and set `prompt_id`
+3. Create adapter implementing `DocumentExtractor` protocol
+4. Add factory function to `extractor_factory.py::DOC_PROVIDER_REGISTRY`
+5. UI/CLI automatically detect new extractor (no code changes needed)
+
+**Current Extractors**:
+- **docling** (Local OCR): FREE, fast, production-ready, recommended for most documents
+- **qwen_vl** (Budget Vision): $0.00512/page, multimodal, fallback for poor quality scans
+
 ### The Prompt Contract
 **Critical**: `LEGAL_EVENTS_PROMPT` in `src/core/constants.py` defines the extraction schema. All providers must return this exact JSON structure:
 
