@@ -1,0 +1,94 @@
+{
+  "order_id": "cost-estimator-002",
+  "priority": "high",
+  "version": "v1.0",
+  "supercontext": {
+    "repository": "docling_langextract_testing",
+    "mission": "Give users an end-to-end cost preview that reflects both document extraction (Layer 1) and event extraction (Layer 2) before they start a run."
+  },
+  "goal": "Augment the cost estimator so it factors in document extraction pricing (Docling, Qwen-VL, Gemini 2.5, etc.), surfaces a layered breakdown, and reports a combined total across CLI and Streamlit flows.",
+  "execution_instructions": [
+    "Keep Layer 1 pricing data centralized—mirror the ModelCatalog approach (extend it or add a sibling registry) instead of sprinkling literals in the UI.",
+    "Treat Docling as a zero-cost baseline but allow per-document overrides for paid extractors (e.g., Qwen-VL vision, Gemini 2.5 vision).",
+    "Maintain the existing token-based heuristic for Layer 2; the new Layer 1 work should slot in without altering provider selection UX.",
+    "Derive document page counts (or equivalent billing units) without invoking paid extractors—prefer lightweight metadata reads or fallbacks rather than running vision extraction up front."
+  ],
+  "tasks": [
+    {
+      "id": "capture-doc-pricing",
+      "description": "Document the pricing inputs for each supported document extractor.",
+      "steps": [
+        "Audit the doc extractor options in `app.py` (Docling, Qwen-VL, Gemini 2.5) and any related config helpers.",
+        "Confirm current assumptions (e.g., Qwen-VL ≈ $0.077 per 15-page PDF, Gemini 2.5 ≈ $0.50-$1.25 per 15-page PDF) and normalize them to a per-page or per-document rate the estimator can consume.",
+        "Record the data in code comments or docstrings so the source of the numbers is obvious for future adjustments."
+      ]
+    },
+    {
+      "id": "estimate-page-count",
+      "description": "Implement a pre-extraction estimator for document size.",
+      "steps": [
+        "Add a helper (e.g., `estimate_document_pages`) that inspects uploaded files to approximate page count or billing units without calling remote extractors.",
+        "Prefer format-aware metadata reads (PDF page count via `pypdfium2`, DOCX slide count, etc.) and add safe fallbacks for plain text or unsupported types (e.g., assume 1 page or scale with file size).",
+        "Return both the numeric estimate and a confidence flag/message so the UI can disclaim low-certainty cases."
+      ]
+    },
+    {
+      "id": "extend-catalog",
+      "description": "Centralize document extraction pricing alongside the model catalog.",
+      "steps": [
+        "Decide whether to extend `ModelCatalog` with Layer 1 records or introduce a dedicated `DocumentExtractorCatalog` with a matching API (lookup, list).",
+        "Store pricing metadata (cost per page/doc, included pages, notes, provider URLs) in that registry and expose helper accessors.",
+        "Add guardrails for missing pricing (default to zero, flag in logs)."
+      ]
+    },
+    {
+      "id": "update-estimator",
+      "description": "Calculate Layer 1 + Layer 2 costs inside the estimator module.",
+      "steps": [
+        "Enhance `src/ui/cost_estimator.py` so it can accept a `doc_extractor` identifier and return a structure with `document_cost`, `event_cost`, and `total_cost`.",
+        "Wire in the new `estimate_document_pages` helper (or equivalent) so Layer 1 pricing uses the pre-extraction page estimate; expose configuration overrides for default pages when metadata is unavailable.",
+        "Adjust `estimate_all_models` / `get_cost_summary` to include the Layer 1 component and expose a combined total in their outputs."
+      ]
+    },
+    {
+      "id": "update-surfaces",
+      "description": "Show the layered breakdown everywhere costs render.",
+      "steps": [
+        "Update `display_cost_estimates` in `src/ui/streamlit_common.py` to show separate Streamlit metrics for Document Extraction, Event Extraction, and Total (with doc extractor name).",
+        "Mirror the same breakdown in CLI paths (e.g., `scripts/classify_documents.py`).",
+        "Ensure free paths (Docling + DeepSeek) still read as $0.00 while paid extractors add their layer correctly."
+      ]
+    },
+    {
+      "id": "tests-and-docs",
+      "description": "Add regression coverage and documentation for the layered estimator.",
+      "steps": [
+        "Extend `tests/test_cost_estimator.py` (or add a sibling test) to cover document extractor cost calculations, zero-cost defaults, and combined totals.",
+        "Update `docs/reference/cost_estimator.md` with a new section that explains the two-layer model, the pricing table, and how to adjust the page-count heuristic.",
+        "Capture any discrepancies or calibration needs (e.g., variable pricing tiers) in the testing notes."
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "The estimator returns a structure that clearly separates document extraction cost, event extraction cost, and total cost.",
+    "Streamlit and CLI experiences display the layered breakdown with accurate labels and zero-cost cases for Docling.",
+    "Document extractor pricing is managed from a single registry/source of truth and can be updated without touching UI code.",
+    "Unit tests verify both layers and combined totals; documentation outlines the assumptions and future calibration hooks."
+  ],
+  "constraints": {
+    "what_not_to_do": [
+      "Do not hard-code pricing strings directly in Streamlit widgets or CLI print statements.",
+      "Avoid calling external pricing APIs—use static values and document the source.",
+      "Do not remove or weaken existing Layer 2 token heuristics; any adjustments should be opt-in and tested.",
+      "Do not run the paid document extractor just to obtain a page count for estimation—fall back to heuristics instead."
+    ],
+    "escalation_guidance": "If pricing data is ambiguous (e.g., varying per-page tiers), capture the uncertainty in the docs and pause implementation until product confirms the numbers."
+  },
+  "testing": {
+    "required_commands": [
+      "uv run python -m pytest tests/test_cost_estimator.py -v",
+      "uv run python scripts/classify_documents.py --files test_documents/abc_xyz_contract_dispute.txt --estimate-only --max-chars 1600"
+    ],
+    "notes": "Manual Streamlit verification recommended: run `uv run streamlit run app.py`, upload a 15-page sample, and confirm the layered metrics reflect both Doc Extractor and Event Extractor totals."
+  }
+}

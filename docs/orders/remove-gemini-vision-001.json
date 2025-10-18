@@ -1,0 +1,128 @@
+{
+  "order_id": "remove-gemini-vision-001",
+  "version": "2.0",
+
+  "classification": {
+    "type": "refactor",
+    "risk_level": "medium",
+    "estimated_complexity": "moderate",
+    "requires_human_review": true,
+    "affects_production": true
+  },
+
+  "context": {
+    "problem_statement": "Gemini 2.5 vision uploads now fail (Missing required parameter \"ragStoreName\"), so the premium document extractor is broken and confuses users.",
+    "goal": "Remove Gemini 2.5 from the document extractor layer so only Docling and Qwen-VL remain selectable and runnable.",
+    "non_goals": [
+      "Do not change LangExtract / OpenRouter event extraction",
+      "Do not attempt to reimplement Gemini vision support"
+    ],
+    "related_orders": []
+  },
+
+  "execution": {
+    "prerequisites": {
+      "tools": ["uv"],
+      "environment": [],
+      "pre_checks": [
+        "Tests on main are green",
+        "No outstanding Gemini vision runs in progress"
+      ]
+    },
+    "tasks": [
+      {
+        "id": "T1",
+        "description": "Retire Gemini from the document extractor registry and factory.",
+        "type": "automated",
+        "estimated_duration": "15m",
+        "validation": "No code path references GeminiDocumentExtractor; ExtractorFactory only exposes Docling and Qwen-VL.",
+        "rollback": "Revert the registry/factory changes.",
+        "depends_on": []
+      },
+      {
+        "id": "T2",
+        "description": "Update UI/UX to remove Gemini from configuration surfaces.",
+        "type": "automated",
+        "estimated_duration": "20m",
+        "validation": "Streamlit radio only shows Docling and Qwen-VL; help text and tooltips mention the remaining options only.",
+        "rollback": "Revert UI changes.",
+        "depends_on": ["T1"]
+      },
+      {
+        "id": "T3",
+        "description": "Prune Gemini-specific helpers, tests, docs, and configs.",
+        "type": "automated",
+        "estimated_duration": "20m",
+        "validation": "Gemini doc extractor module is removed (or guarded behind dead-code check); docs/reference/cost_estimator.md, config guidance, and tests no longer mention Gemini.",
+        "rollback": "Revert documentation/test deletions.",
+        "depends_on": ["T1"]
+      },
+      {
+        "id": "T4",
+        "description": "Verify cost estimation and CLI flows only list supported document extractors.",
+        "type": "automated",
+        "estimated_duration": "10m",
+        "validation": "Cost estimator catalog excludes Gemini; CLI help does not mention Gemini; unit tests cover the remaining options.",
+        "rollback": "Restore catalog/test changes.",
+        "depends_on": ["T1", "T3"]
+      }
+    ],
+    "checkpoints": [
+      {
+        "after_task": "T2",
+        "verify": [
+          "Streamlit UI still loads",
+          "Document extractor selection defaults to Docling"
+        ],
+        "pause_for_review": false
+      }
+    ]
+  },
+
+  "constraints": {
+    "must": [
+      "Maintain Docling and Qwen-VL functionality and tests",
+      "Keep environment variable handling backwards compatible (missing GEMINI_API_KEY should not break anything)"
+    ],
+    "do_not": [
+      "Do not leave dead references to Gemini anywhere in code or documentation",
+      "Do not modify event extractor providers"
+    ],
+    "performance": {
+      "max_execution_time": "30m",
+      "max_memory_usage": "2GB",
+      "max_api_calls": 0
+    }
+  },
+
+  "validation": {
+    "acceptance_criteria": [
+      "Extractor factory and registries expose only Docling and Qwen-VL",
+      "UI/CLI no longer mention Gemini",
+      "Docs/tests updated to reflect the two remaining document extractors"
+    ],
+    "testing": [
+      "uv run python -m pytest tests/test_cost_estimator.py -v"
+    ],
+    "post_checks": [
+      "Launch Streamlit (`uv run streamlit run app.py`) and verify selection/processing works with Docling and Qwen-VL"
+    ]
+  },
+
+  "metadata": {
+    "created_at": "2025-02-15T12:00:00Z",
+    "updated_at": "2025-02-15T12:00:00Z",
+    "created_by": "agent@company.com",
+    "status": "draft"
+  },
+
+  "audit": {
+    "require_approval": true,
+    "approvers": ["tech-lead@company.com"],
+    "escalation_triggers": [
+      "Unexpected references to Gemini remain after code search",
+      "Removal breaks existing Qwen-VL configuration"
+    ],
+    "fallback": "Revert changes and restore previous Gemini support if removal causes unexpected regressions"
+  }
+}
