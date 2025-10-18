@@ -177,14 +177,63 @@ def _create_deepseek_event_extractor(
     return DeepSeekEventExtractor(event_config)
 
 
-EVENT_PROVIDER_REGISTRY: Dict[str, Callable[[DoclingConfig, Any, ExtractorConfig], EventExtractor]] = {
-    "langextract": _create_langextract_event_extractor,
-    "openrouter": _create_openrouter_event_extractor,
-    "opencode_zen": _create_opencode_zen_event_extractor,
-    "openai": _create_openai_event_extractor,
-    "anthropic": _create_anthropic_event_extractor,
-    "deepseek": _create_deepseek_event_extractor,
-}
+def _build_event_provider_registry() -> Dict[str, Callable[[DoclingConfig, Any, ExtractorConfig], EventExtractor]]:
+    """
+    Build event provider registry dynamically from catalog entries.
+
+    This function reads factory_callable strings from the catalog and dynamically
+    imports them to build the registry. Only whitelisted import paths are allowed.
+
+    Returns:
+        Dict mapping provider_id to factory function
+    """
+    from .event_extractor_catalog import get_event_extractor_catalog
+
+    catalog = get_event_extractor_catalog()
+    registry = {}
+
+    # Get all enabled extractors with factory callables
+    for entry in catalog.list_extractors(enabled=True):
+        if not entry.factory_callable:
+            logger.debug(f"Skipping {entry.provider_id}: no factory_callable defined")
+            continue
+
+        try:
+            # Security: Validate import path is whitelisted
+            module_path = entry.factory_callable.rsplit('.', 1)[0]
+            if not any(module_path.startswith(prefix) for prefix in _FACTORY_IMPORT_WHITELIST):
+                logger.warning(
+                    f"Skipping {entry.provider_id}: factory_callable '{entry.factory_callable}' "
+                    f"not in whitelist {_FACTORY_IMPORT_WHITELIST}"
+                )
+                continue
+
+            # Dynamically import factory function
+            module_name, func_name = entry.factory_callable.rsplit('.', 1)
+            module = importlib.import_module(module_name)
+            factory_func = getattr(module, func_name)
+
+            registry[entry.provider_id] = factory_func
+            logger.debug(f"✅ Registered {entry.provider_id} → {entry.factory_callable}")
+
+        except (ImportError, AttributeError, ValueError) as e:
+            logger.warning(
+                f"Failed to load factory for {entry.provider_id} "
+                f"from '{entry.factory_callable}': {e}. Skipping."
+            )
+            continue
+
+    # Fallback: Ensure LangExtract is available as safe default
+    if "langextract" not in registry:
+        logger.warning("LangExtract not found in dynamic registry, adding fallback")
+        registry["langextract"] = _create_langextract_event_extractor
+
+    logger.info(f"🏭 Built event provider registry with {len(registry)} extractors: {list(registry.keys())}")
+    return registry
+
+
+# Build registry dynamically from catalog at module load time
+EVENT_PROVIDER_REGISTRY = _build_event_provider_registry()
 
 
 def build_extractors(
@@ -233,7 +282,7 @@ def build_extractors(
             f"Enable it in document_extractor_catalog.py or choose a different extractor."
         )
 
-    logger.info(f"✅ Catalog validated: {catalog_entry.display_name} (enabled)")
+    logger.info(f"✅ Doc catalog validated: {catalog_entry.display_name} (enabled)")
 
     # Create document extractor
     doc_factory = DOC_PROVIDER_REGISTRY.get(doc_extractor_type)
@@ -245,6 +294,28 @@ def build_extractors(
         )
     doc_extractor = doc_factory(docling_config, None, extractor_config)
     logger.info(f"✅ Created {doc_extractor.__class__.__name__}")
+
+    # Validate event extractor exists in catalog and is enabled
+    from .event_extractor_catalog import get_event_extractor_catalog
+    event_catalog = get_event_extractor_catalog()
+    event_catalog_entry = event_catalog.get_extractor(event_extractor_type)
+
+    if not event_catalog_entry:
+        available_ids = event_catalog.get_all_provider_ids()
+        available = ", ".join(sorted(available_ids)) or "none"
+        logger.error(f"❌ Event extractor '{event_extractor_type}' not found in catalog")
+        raise ExtractorConfigurationError(
+            f"Event extractor '{event_extractor_type}' not found in catalog. Available providers: {available}"
+        )
+
+    if not event_catalog_entry.enabled:
+        logger.error(f"❌ Event extractor '{event_extractor_type}' is disabled in catalog")
+        raise ExtractorConfigurationError(
+            f"Event extractor '{event_extractor_type}' is disabled in catalog. "
+            f"Enable it in event_extractor_catalog.py or choose a different provider."
+        )
+
+    logger.info(f"✅ Event catalog validated: {event_catalog_entry.display_name} (enabled)")
 
     # Create event extractor
     event_factory = EVENT_PROVIDER_REGISTRY.get(event_extractor_type)

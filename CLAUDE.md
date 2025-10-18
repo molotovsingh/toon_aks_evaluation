@@ -255,6 +255,124 @@ prompt = catalog.get_prompt('qwen_vl')
 - **docling** (Local OCR): FREE, fast, production-ready, recommended for most documents
 - **qwen_vl** (Budget Vision): $0.00512/page, multimodal, fallback for poor quality scans
 
+### Event Extractor Catalog
+
+The system uses a **centralized catalog** for Layer 2 event extraction configuration in `event_extractor_catalog.py`:
+
+**Purpose**: Single source of truth for event extractor provider metadata (capabilities, prompts, availability)
+
+**Key Features**:
+- **Capability Flags**: Runtime model support, single vs multi-model providers
+- **Prompt Management**: Named prompts with inline override support
+- **Enabled Toggle**: Control provider availability without code changes
+- **Dynamic Factory**: EVENT_PROVIDER_REGISTRY auto-built from `catalog.list_extractors(enabled=True)`
+- **Security**: Whitelist validation (`src.core.*` imports only)
+
+**Catalog Entry Schema** (`EventExtractorEntry`):
+```python
+EventExtractorEntry(
+    # === Identification ===
+    provider_id="openrouter",           # Unique identifier
+    display_name="OpenRouter",
+
+    # === Registry Control ===
+    enabled=True,                       # Toggle availability in UI/CLI/factory
+    factory_callable="src.core.extractor_factory._create_openrouter_event_extractor",  # Factory function reference
+    prompt_id=None,                     # Reference to named prompt (optional)
+    prompt_override=None,               # Inline prompt (overrides prompt_id)
+
+    # === Capabilities ===
+    supports_runtime_model=True,        # Multi-model selection support
+
+    # === Metadata ===
+    recommended=True,
+    notes="Unified API for 10+ curated models. Best for A/B testing.",
+    documentation_url="https://openrouter.ai/docs"
+)
+```
+
+**Usage Examples**:
+```python
+# Get catalog instance
+from src.core.event_extractor_catalog import get_event_extractor_catalog
+catalog = get_event_extractor_catalog()
+
+# Query extractors
+enabled_providers = catalog.list_extractors(enabled=True)
+multi_model_providers = catalog.list_extractors(supports_runtime_model=True)
+recommended_providers = catalog.list_extractors(recommended_only=True)
+
+# Validate provider ID
+is_valid = catalog.validate_provider_id('openrouter')  # Returns: True
+
+# Get provider prompt (if configured)
+prompt = catalog.get_prompt('openrouter')  # Returns: None (uses LEGAL_EVENTS_PROMPT default)
+```
+
+**Factory Integration** (Dynamic Bootstrapping):
+- **EVENT_PROVIDER_REGISTRY** is dynamically built from catalog at module load time
+- Factory imports factory functions from `factory_callable` string references
+- Whitelist validation: Only `src.core.*` imports allowed (security)
+- Graceful degradation: Invalid entries are logged and skipped
+- Enabled flag enforced: Disabled providers excluded from registry
+- LangExtract fallback: Always available as safe default
+
+**Adding New Event Extractors**:
+1. **Create adapter** in `src/core/` implementing `EventExtractor` protocol:
+   ```python
+   class MyProviderAdapter:
+       def extract_events(self, text: str, metadata: Dict) -> List[EventRecord]:
+           # Return EventRecord with five-column schema
+
+       def is_available(self) -> bool:
+           # Check API key exists
+   ```
+
+2. **Add factory function** to `extractor_factory.py`:
+   ```python
+   def _create_myprovider_event_extractor(doc_config, event_config, extractor_config):
+       return MyProviderAdapter(event_config)
+   ```
+
+3. **Add catalog entry** to `_EVENT_EXTRACTOR_REGISTRY` in `event_extractor_catalog.py`:
+   ```python
+   EventExtractorEntry(
+       provider_id="myprovider",
+       display_name="My Provider",
+       enabled=False,  # Start disabled for testing
+       factory_callable="src.core.extractor_factory._create_myprovider_event_extractor",
+       supports_runtime_model=False,  # True if provider supports model selection
+       notes="My custom event extraction provider"
+   )
+   ```
+
+4. **Add config class** to `config.py`:
+   ```python
+   @dataclass
+   class MyProviderConfig:
+       api_key: str = field(default_factory=lambda: env_str("MYPROVIDER_API_KEY", ""))
+       model: str = field(default_factory=lambda: env_str("MYPROVIDER_MODEL", "default-model"))
+   ```
+
+5. **Update** `load_provider_config()` in `config.py` to handle new provider
+
+6. **Test with enabled=False** → Verify factory skips, UI hides provider
+
+7. **Set enabled=True** → Restart app → Provider appears everywhere automatically
+
+**Disabling Providers**:
+- Set `enabled=False` in catalog entry → Provider disappears from factory/UI/CLI
+- No need to comment out code or edit factory map
+- Change takes effect on app restart
+
+**Current Providers**:
+- **langextract** (Gemini): Default, recommended, supports runtime model override
+- **openrouter** (Unified API): Recommended, 10+ curated models, runtime model selection
+- **openai** (Direct API): GPT-4o-mini/GPT-4o/GPT-5, runtime model selection
+- **anthropic** (Direct API): Claude 3 Haiku/Sonnet 4.5/Opus 4, runtime model selection
+- **deepseek** (Direct API): DeepSeek-Chat, single model
+- **opencode_zen** (Legal AI): Specialized legal extraction, single model
+
 ### The Prompt Contract
 **Critical**: `LEGAL_EVENTS_PROMPT` in `src/core/constants.py` defines the extraction schema. All providers must return this exact JSON structure:
 

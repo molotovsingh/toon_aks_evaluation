@@ -587,8 +587,37 @@ def main():
     parser = argparse.ArgumentParser(description="OpenRouter Configuration Diagnostic")
     parser.add_argument("--test-model", help="Override model for testing (e.g., google/gemini-2.0-flash-exp:free)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--list-providers", action="store_true", help="List all available event extraction providers from catalog")
 
     args = parser.parse_args()
+
+    # Handle --list-providers flag
+    if args.list_providers:
+        from src.core.event_extractor_catalog import get_event_extractor_catalog
+
+        catalog = get_event_extractor_catalog()
+        providers = catalog.list_extractors(enabled=True)
+
+        print("=" * 70)
+        print("AVAILABLE EVENT EXTRACTION PROVIDERS")
+        print("=" * 70)
+        print()
+
+        for provider in providers:
+            status = "✓ Recommended" if provider.recommended else ""
+            runtime = " [Runtime Model Support]" if provider.supports_runtime_model else ""
+            print(f"• {provider.display_name} ({provider.provider_id}){runtime}")
+            print(f"  {provider.notes}")
+            if status:
+                print(f"  {status}")
+            print()
+
+        print(f"Total: {len(providers)} enabled provider(s)")
+        print()
+        print("💡 Run diagnostic for specific provider:")
+        print("   uv run python scripts/test_openrouter.py")
+        print("=" * 70)
+        sys.exit(0)
 
     diagnostic = OpenRouterDiagnostic(
         test_model=args.test_model,

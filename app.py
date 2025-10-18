@@ -581,355 +581,6 @@ def create_unified_model_selector(provider: str, container=st) -> str:
     return selected
 
 
-def create_anthropic_model_selector():
-    """Create Anthropic model selector with search/filter"""
-
-    models = {
-        "🏆 Ground Truth Models": [
-            ("claude-sonnet-4-5", "Claude Sonnet 4.5", "$3/M • 200K", "Tier 1 • Best balance"),
-            ("claude-opus-4", "Claude Opus 4", "$15/M • 200K", "Tier 3 • Highest quality"),
-        ],
-        "📊 Production Models": [
-            ("claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet", "$3/M • 200K", "Quality baseline"),
-            ("claude-3-haiku-20240307", "Claude 3 Haiku", "$0.25/M • 200K", "Budget option"),
-        ],
-    }
-
-    # Flatten into searchable format with normalized search text
-    all_models = []
-    for category, model_list in models.items():
-        category_emoji = category.split()[0]
-        for model_id, display_name, cost, badge in model_list:
-            search_text = f"{display_name} {model_id} {cost} {badge} {category}"
-            all_models.append({
-                "id": model_id,
-                "display": f"{category_emoji} {display_name} • {cost} • {badge}",
-                "search_text": search_text.lower(),
-                "search_text_normalized": normalize_search_text(search_text)
-            })
-
-    # Search box
-    search_query = st.text_input(
-        "🔍 Search Models",
-        placeholder="Type to filter (e.g., 'haiku', 'opus', 'ground truth', 'tier 1')...",
-        key="anthropic_model_search"
-    )
-
-    # Filter models using normalized search
-    if search_query:
-        normalized_query = normalize_search_text(search_query)
-        filtered_models = [m for m in all_models if normalized_query in m["search_text_normalized"]]
-        st.caption(f"Found {len(filtered_models)} model(s)")
-    else:
-        filtered_models = all_models
-
-    # Handle no results
-    if not filtered_models:
-        st.warning("No models match your search. Try different keywords.")
-        return 'claude-3-haiku-20240307'
-
-    # Create selectbox options
-    options = [m["id"] for m in filtered_models]
-    display_map = {m["id"]: m["display"] for m in filtered_models}
-
-    # Session state management
-    default_model = os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307')
-    if 'anthropic_model' not in st.session_state:
-        st.session_state.anthropic_model = default_model
-
-    if st.session_state.anthropic_model not in options:
-        st.session_state.anthropic_model = options[0]
-
-    selected_model = st.selectbox(
-        "Select Model",
-        options=options,
-        index=options.index(st.session_state.anthropic_model),
-        format_func=lambda x: display_map.get(x, x),
-        help="Ground truth models for reference dataset creation. Production models for cost-effective daily use.",
-        key="anthropic_model_selector"
-    )
-
-    if selected_model != st.session_state.anthropic_model:
-        st.session_state.anthropic_model = selected_model
-        if 'legal_events_df' in st.session_state:
-            del st.session_state.legal_events_df
-
-    return selected_model
-
-
-def create_openai_model_selector():
-    """Create OpenAI model selector with search/filter"""
-
-    models = {
-        "🏆 Ground Truth Models": [
-            ("gpt-5", "GPT-5", "$TBD • 128K", "Tier 2 • Pending price"),
-        ],
-        "📊 Production Models": [
-            ("gpt-4o", "GPT-4o", "$2.50/M • 128K", "Flagship model"),
-            ("gpt-4o-mini", "GPT-4o Mini", "$0.15/M • 128K", "Budget option"),
-        ],
-    }
-
-    # Flatten into searchable format with normalized search text
-    all_models = []
-    for category, model_list in models.items():
-        category_emoji = category.split()[0]
-        for model_id, display_name, cost, badge in model_list:
-            search_text = f"{display_name} {model_id} {cost} {badge} {category}"
-            all_models.append({
-                "id": model_id,
-                "display": f"{category_emoji} {display_name} • {cost} • {badge}",
-                "search_text": search_text.lower(),
-                "search_text_normalized": normalize_search_text(search_text)
-            })
-
-    # Search box
-    search_query = st.text_input(
-        "🔍 Search Models",
-        placeholder="Type to filter (e.g., 'gpt 5', 'gpt-5', 'mini', 'ground truth')...",
-        key="openai_model_search"
-    )
-
-    # Filter models using normalized search
-    if search_query:
-        normalized_query = normalize_search_text(search_query)
-        filtered_models = [m for m in all_models if normalized_query in m["search_text_normalized"]]
-        st.caption(f"Found {len(filtered_models)} model(s)")
-    else:
-        filtered_models = all_models
-
-    # Handle no results
-    if not filtered_models:
-        st.warning("No models match your search. Try different keywords.")
-        return 'gpt-4o-mini'
-
-    # Create selectbox options
-    options = [m["id"] for m in filtered_models]
-    display_map = {m["id"]: m["display"] for m in filtered_models}
-
-    # Session state management
-    default_model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
-    if 'openai_model' not in st.session_state:
-        st.session_state.openai_model = default_model
-
-    if st.session_state.openai_model not in options:
-        st.session_state.openai_model = options[0]
-
-    selected_model = st.selectbox(
-        "Select Model",
-        options=options,
-        index=options.index(st.session_state.openai_model),
-        format_func=lambda x: display_map.get(x, x),
-        help="GPT-5 for ground truth creation (pricing TBD). ⚠️ Note: GPT-5 uses temperature=1.0 (non-deterministic) - outputs vary between runs. GPT-4o/mini for production use.",
-        key="openai_model_selector"
-    )
-
-    if selected_model != st.session_state.openai_model:
-        st.session_state.openai_model = selected_model
-        if 'legal_events_df' in st.session_state:
-            del st.session_state.legal_events_df
-
-    return selected_model
-
-
-def create_langextract_model_selector():
-    """Create LangExtract/Gemini model selector with search/filter"""
-
-    models = {
-        "🏆 Ground Truth Models": [
-            ("gemini-2.5-pro", "Gemini 2.5 Pro", "$TBD • 2M", "Tier 2 • Long docs"),
-        ],
-        "📊 Production Models": [
-            ("gemini-2.0-flash", "Gemini 2.0 Flash", "Free • 1M", "Default model"),
-        ],
-    }
-
-    # Flatten into searchable format with normalized search text
-    all_models = []
-    for category, model_list in models.items():
-        category_emoji = category.split()[0]
-        for model_id, display_name, cost, badge in model_list:
-            search_text = f"{display_name} {model_id} {cost} {badge} {category}"
-            all_models.append({
-                "id": model_id,
-                "display": f"{category_emoji} {display_name} • {cost} • {badge}",
-                "search_text": search_text.lower(),
-                "search_text_normalized": normalize_search_text(search_text)
-            })
-
-    # Search box
-    search_query = st.text_input(
-        "🔍 Search Models",
-        placeholder="Type to filter (e.g., 'flash', 'pro', '2m context', 'gemini 2')...",
-        key="langextract_model_search"
-    )
-
-    # Filter models using normalized search
-    if search_query:
-        normalized_query = normalize_search_text(search_query)
-        filtered_models = [m for m in all_models if normalized_query in m["search_text_normalized"]]
-        st.caption(f"Found {len(filtered_models)} model(s)")
-    else:
-        filtered_models = all_models
-
-    # Handle no results
-    if not filtered_models:
-        st.warning("No models match your search. Try different keywords.")
-        return 'gemini-2.0-flash'
-
-    # Create selectbox options
-    options = [m["id"] for m in filtered_models]
-    display_map = {m["id"]: m["display"] for m in filtered_models}
-
-    # Session state management
-    default_model = os.getenv('GEMINI_MODEL_ID', 'gemini-2.0-flash')
-    if 'langextract_model' not in st.session_state:
-        st.session_state.langextract_model = default_model
-
-    if st.session_state.langextract_model not in options:
-        st.session_state.langextract_model = options[0]
-
-    selected_model = st.selectbox(
-        "Select Model",
-        options=options,
-        index=options.index(st.session_state.langextract_model),
-        format_func=lambda x: display_map.get(x, x),
-        help="Gemini 2.5 Pro for ground truth (2M context for very long documents). Gemini 2.0 Flash for daily use.",
-        key="langextract_model_selector"
-    )
-
-    if selected_model != st.session_state.langextract_model:
-        st.session_state.langextract_model = selected_model
-        if 'legal_events_df' in st.session_state:
-            del st.session_state.legal_events_df
-
-    return selected_model
-
-
-def create_openrouter_model_selector():
-    """Create OpenRouter model selector with search/filter (scales to 100+ models)"""
-
-    # Curated models from Oct 2025 testing (scripts/test_fallback_models.py + real doc benchmarks)
-    # Only includes models that passed JSON mode tests (10/10 or 9/10 quality)
-    # Organized by use case rather than price for better UX
-    models = {
-        "🎯 Recommended Starting Point": [
-            ("openai/gpt-4o-mini", "GPT-4o Mini", "$0.15/M • 128K", "⭐ 9/10 • Balanced"),
-        ],
-        "💰 Budget Conscious": [
-            ("deepseek/deepseek-r1-distill-llama-70b", "DeepSeek R1 Distill", "$0.03/M • 128K", "⭐ 10/10 • CHEAPEST"),
-            ("qwen/qwq-32b", "Qwen QwQ 32B", "$0.115/M • 128K", "7/10 • Ultra-cheap ⚠️"),
-            ("anthropic/claude-3-haiku", "Claude 3 Haiku", "$0.25/M • 200K", "10/10 • 4.4s ⚡"),
-            ("deepseek/deepseek-chat", "DeepSeek Chat", "$0.25/M • 128K", "10/10 • Fast"),
-        ],
-        "📄 Long Documents (50+ pages)": [
-            ("anthropic/claude-3-5-sonnet", "Claude 3.5 Sonnet", "$3/M • 200K", "⭐ 10/10 • Max context"),
-            ("anthropic/claude-3-haiku", "Claude 3 Haiku", "$0.25/M • 200K", "10/10 • Budget + 200K"),
-        ],
-        "🏆 Maximum Quality": [
-            ("anthropic/claude-3-5-sonnet", "Claude 3.5 Sonnet", "$3/M • 200K", "⭐ 10/10 • Premium"),
-            ("openai/gpt-4o", "GPT-4o", "$3/M • 128K", "10/10 • OpenAI flagship"),
-        ],
-        "🌍 Open Source / EU Hosting": [
-            ("meta-llama/llama-3.3-70b-instruct", "Llama 3.3 70B", "$0.60/M • 128K", "10/10 • OSS"),
-            ("mistralai/mistral-small", "Mistral Small", "$0.20/M • 128K", "10/10 • EU compliance"),
-            ("openai/gpt-oss-120b", "GPT-OSS 120B", "$0.31/M • 128K", "10/10 • Self-hostable"),
-        ]
-    }
-
-    # Flatten into searchable format with pre-computed normalized search text
-    all_models = []
-    for category, model_list in models.items():
-        category_emoji = category.split()[0]
-        for model_id, display_name, cost, badge in model_list:
-            search_text = f"{display_name} {model_id} {cost} {badge} {category}"
-            all_models.append({
-                "id": model_id,
-                "name": display_name,
-                "cost": cost,
-                "badge": badge,
-                "category": category,
-                "display": f"{category_emoji} {display_name} • {cost} • {badge}",
-                "search_text": search_text.lower(),
-                "search_text_normalized": normalize_search_text(search_text)
-            })
-
-    # Search box
-    search_query = st.text_input(
-        "🔍 Search Models",
-        placeholder="Type to filter (e.g., 'claude 3', 'gpt 4o', '200k', 'budget')...",
-        key="openrouter_model_search"
-    )
-
-    # Filter models using normalized search
-    if search_query:
-        normalized_query = normalize_search_text(search_query)
-        filtered_models = [m for m in all_models if normalized_query in m["search_text_normalized"]]
-        st.caption(f"Found {len(filtered_models)} model(s)")
-    else:
-        filtered_models = all_models
-
-    # Handle no results
-    if not filtered_models:
-        st.warning("No models match your search. Try different keywords.")
-        return os.getenv('OPENROUTER_MODEL', 'openai/gpt-4o-mini')
-
-    # Create selectbox options
-    options = [m["id"] for m in filtered_models]
-    display_map = {m["id"]: m["display"] for m in filtered_models}
-
-    # Get default from env or session state
-    default_model = os.getenv('OPENROUTER_MODEL', 'openai/gpt-4o-mini')
-    if 'openrouter_model' not in st.session_state:
-        st.session_state.openrouter_model = default_model
-
-    # Ensure default is in filtered options (fallback to first if not)
-    if st.session_state.openrouter_model not in options:
-        st.session_state.openrouter_model = options[0]
-
-    # Model selector
-    selected_model = st.selectbox(
-        "Select Model",
-        options=options,
-        index=options.index(st.session_state.openrouter_model),
-        format_func=lambda x: display_map.get(x, x),
-        help="Battle-tested models (Oct 2025). Quality scores from JSON mode + legal extraction tests.",
-        key="openrouter_model_selector"
-    )
-
-    # Update session state if changed
-    if selected_model != st.session_state.openrouter_model:
-        st.session_state.openrouter_model = selected_model
-        # Clear previous results when model changes
-        if 'legal_events_df' in st.session_state:
-            del st.session_state.legal_events_df
-
-    # Model selection guidance
-    with st.expander("💡 Quick Selection Guide", expanded=False):
-        st.markdown("""
-        **Not sure which model to choose?**
-
-        - **New user?** → Start with **GPT-4o Mini** (proven on 15-page contracts, best balance)
-        - **Processing 1000+ documents?** → Use **DeepSeek R1 Distill** (50x cheaper, same 10/10 quality)
-        - **Extreme budget?** → Try **Qwen QwQ 32B** ($0.115/M, but ⚠️ may miss some events on complex docs)
-        - **50+ page contracts?** → Use **Claude 3.5 Sonnet** or **Claude 3 Haiku** (200K context window)
-        - **Need results in 5 seconds?** → Use **Claude 3 Haiku** (4.4s extraction time)
-        - **EU data compliance?** → Use **Mistral Small** (EU-hosted model)
-        - **Privacy/sovereignty concerns?** → Use **GPT-OSS 120B** (Apache 2.0, can self-host if needed)
-
-        **Key Metrics**:
-        - **Quality scores** (10/10, 9/10, 7/10): From Oct 2025 JSON mode + legal extraction tests
-        - **⚠️ Warning symbol**: Model may extract fewer events on complex documents (test before production)
-        - **Context window** (128K, 200K): Capacity for long documents (~100-200 pages)
-        - **Cost** (/M = per million tokens): $0.03 to $3.00 range
-        - **Speed**: Claude 3 Haiku extracts in 4.4s vs others at 14-36s
-
-        ℹ️ Most models scored 10/10 or 9/10. GPT-OSS/Gemini/Cohere/Perplexity failed and were excluded.
-        """)
-
-    return selected_model
-
-
 def create_doc_extractor_selection():
     """Create document extractor selection UI (dynamically generated from registry)"""
     st.markdown('<div class="section-header">📄 Document Processing</div>', unsafe_allow_html=True)
@@ -1002,167 +653,189 @@ def create_doc_extractor_selection():
 
 
 def create_provider_selection():
-    """Create provider selection: Two primary providers (OpenRouter + LangExtract) with advanced options"""
+    """Create provider selection: Dynamically generated from event extractor catalog"""
     # Styled section header
     st.markdown('<div class="section-header">🤖 Event Extraction Provider</div>', unsafe_allow_html=True)
+
+    # Import event extractor catalog
+    from src.core.event_extractor_catalog import get_event_extractor_catalog
+
+    catalog = get_event_extractor_catalog()
+    enabled_providers = catalog.list_extractors(enabled=True)
+
+    if not enabled_providers:
+        st.error("❌ No event extractors available. Check catalog configuration.")
+        return 'langextract', None
 
     # Initialize session state
     default_provider = os.getenv('EVENT_EXTRACTOR', 'openrouter').lower()
     if 'selected_provider' not in st.session_state:
         st.session_state.selected_provider = default_provider
 
-    # === PRIMARY: Three main providers side-by-side ===
-    col1, col2, col3 = st.columns(3)
+    # Separate recommended (primary) providers from advanced providers
+    primary_providers = [p for p in enabled_providers if p.recommended]
+    advanced_providers = [p for p in enabled_providers if not p.recommended]
 
-    # Column 1: OpenRouter
-    with col1:
-        openrouter_configured = check_provider_status('openrouter')
-        is_openrouter_selected = st.session_state.selected_provider == 'openrouter'
+    # If fewer than 3 recommended, fill with advanced providers
+    if len(primary_providers) < 3:
+        needed = 3 - len(primary_providers)
+        primary_providers.extend(advanced_providers[:needed])
+        advanced_providers = advanced_providers[needed:]
 
-        if st.button(
-            "🌐 OpenRouter",
-            key="provider_openrouter",
-            width="stretch",
-            type="primary" if is_openrouter_selected else "secondary"
-        ):
-            if st.session_state.selected_provider != 'openrouter':
-                st.session_state.selected_provider = 'openrouter'
-                if 'legal_events_df' in st.session_state:
-                    del st.session_state.legal_events_df
-                st.rerun()
+    # Dynamic provider icon mapping
+    provider_icons = {
+        'openrouter': '🌐',
+        'langextract': '🔮',
+        'openai': '🧠',
+        'anthropic': '🎯',
+        'deepseek': '🔍',
+        'opencode_zen': '⚖️'
+    }
 
-        st.caption("One API • 18+ Models")
-        if openrouter_configured:
-            st.markdown('<span class="status-pill ready">✓ Ready</span>', unsafe_allow_html=True)
-        else:
-            st.markdown('<span class="status-pill setup">⚠ Setup Required</span>', unsafe_allow_html=True)
+    # Map provider_id to MODEL_CATALOG provider name for model selectors
+    model_catalog_map = {
+        'langextract': 'google',
+        'openrouter': 'openrouter',
+        'openai': 'openai',
+        'anthropic': 'anthropic',
+        'deepseek': 'deepseek'
+    }
 
-    # Column 2: Gemini
-    with col2:
-        langextract_configured = check_provider_status('langextract')
-        is_langextract_selected = st.session_state.selected_provider == 'langextract'
+    # API key environment variable and URL mapping
+    api_key_map = {
+        'langextract': ('GEMINI_API_KEY', 'https://aistudio.google.com/app/apikey'),
+        'openrouter': ('OPENROUTER_API_KEY', 'https://openrouter.ai/keys'),
+        'openai': ('OPENAI_API_KEY', 'https://platform.openai.com/api-keys'),
+        'anthropic': ('ANTHROPIC_API_KEY', 'https://console.anthropic.com/'),
+        'deepseek': ('DEEPSEEK_API_KEY', 'https://platform.deepseek.com/'),
+        'opencode_zen': ('OPENCODEZEN_API_KEY', None)
+    }
 
-        if st.button(
-            "🔮 Gemini",
-            key="provider_langextract",
-            width="stretch",
-            type="primary" if is_langextract_selected else "secondary"
-        ):
-            if st.session_state.selected_provider != 'langextract':
-                st.session_state.selected_provider = 'langextract'
-                if 'legal_events_df' in st.session_state:
-                    del st.session_state.legal_events_df
-                st.rerun()
+    # === PRIMARY: Top recommended providers side-by-side ===
+    num_primary = min(len(primary_providers), 3)
+    if num_primary > 0:
+        cols = st.columns(num_primary)
 
-        st.caption("Google • 2M Context")
-        if langextract_configured:
-            st.markdown('<span class="status-pill ready">✓ Ready</span>', unsafe_allow_html=True)
-        else:
-            st.markdown('<span class="status-pill setup">⚠ Setup Required</span>', unsafe_allow_html=True)
+        for idx, provider_entry in enumerate(primary_providers):
+            with cols[idx]:
+                provider_id = provider_entry.provider_id
+                is_configured = check_provider_status(provider_id)
+                is_selected = st.session_state.selected_provider == provider_id
 
-    # Column 3: OpenAI
-    with col3:
-        openai_configured = check_provider_status('openai')
-        is_openai_selected = st.session_state.selected_provider == 'openai'
-
-        if st.button(
-            "🧠 OpenAI",
-            key="provider_openai",
-            width="stretch",
-            type="primary" if is_openai_selected else "secondary"
-        ):
-            if st.session_state.selected_provider != 'openai':
-                st.session_state.selected_provider = 'openai'
-                if 'legal_events_df' in st.session_state:
-                    del st.session_state.legal_events_df
-                st.rerun()
-
-        st.caption("GPT-5 • GPT-4o")
-        if openai_configured:
-            st.markdown('<span class="status-pill ready">✓ Ready</span>', unsafe_allow_html=True)
-        else:
-            st.markdown('<span class="status-pill setup">⚠ Setup Required</span>', unsafe_allow_html=True)
-
-    # Show model selector if OpenRouter is selected
-    if is_openrouter_selected:
-        if openrouter_configured:
-            st.markdown("")  # Spacing
-            selected_model = create_unified_model_selector('openrouter')
-            return 'openrouter', selected_model
-        else:
-            st.info("💡 **Setup**: Add `OPENROUTER_API_KEY` to your `.env` file, then restart.\n\nGet free API key: https://openrouter.ai/keys")
-            return 'openrouter', None
-
-    # Show model selector if Gemini is selected
-    if is_langextract_selected:
-        if langextract_configured:
-            st.markdown("")  # Spacing
-            selected_model = create_unified_model_selector('google')  # 'google' in MODEL_CATALOG, backend uses 'langextract'
-            return 'langextract', selected_model
-        else:
-            st.info("💡 **Setup**: Add `GEMINI_API_KEY` to your `.env` file, then restart.\n\nGet free API key: https://aistudio.google.com/app/apikey")
-            return 'langextract', None
-
-    # Show model selector if OpenAI is selected
-    if is_openai_selected:
-        if openai_configured:
-            st.markdown("")  # Spacing
-            selected_model = create_unified_model_selector('openai')
-            return 'openai', selected_model
-        else:
-            st.info("💡 **Setup**: Add `OPENAI_API_KEY` to your `.env` file, then restart.\n\nGet API key: https://platform.openai.com/api-keys")
-            return 'openai', None
-
-    st.divider()
-
-    # === SECONDARY: Direct Provider APIs (Advanced) ===
-    with st.expander("🔧 Direct Provider APIs (Advanced)", expanded=False):
-        st.caption("Enterprise-grade providers with direct API access")
-
-        # Direct provider options (OpenAI now in primary section)
-        direct_providers = {
-            'anthropic': ('🎯 Anthropic', 'Claude 3.5', 'Premium', 'ANTHROPIC_API_KEY'),
-            'deepseek': ('🔍 DeepSeek', 'DeepSeek R1', 'Budget', 'DEEPSEEK_API_KEY'),
-            'opencode_zen': ('⚖️ OpenCode Zen', 'Legal AI', 'Premium', 'OPENCODEZEN_API_KEY'),
-        }
-
-        cols = st.columns(2)
-        for idx, (key, (icon_name, subtitle, tier, env_key)) in enumerate(direct_providers.items()):
-            col = cols[idx % 2]
-
-            with col:
-                is_configured = check_provider_status(key)
-                is_selected = st.session_state.selected_provider == key
+                # Get icon and display name from mapping
+                icon = provider_icons.get(provider_id, '🤖')
 
                 if st.button(
-                    f"{icon_name}",
-                    key=f"provider_{key}",
+                    f"{icon} {provider_entry.display_name}",
+                    key=f"provider_{provider_id}",
                     width="stretch",
                     type="primary" if is_selected else "secondary"
                 ):
-                    if st.session_state.selected_provider != key:
-                        st.session_state.selected_provider = key
+                    if st.session_state.selected_provider != provider_id:
+                        st.session_state.selected_provider = provider_id
                         if 'legal_events_df' in st.session_state:
                             del st.session_state.legal_events_df
                         st.rerun()
 
-                st.caption(f"{subtitle} • {tier}")
-                badge = "✅" if is_configured else f"⚠️ {env_key}"
-                st.caption(badge)
+                # Show notes/subtitle from catalog (first sentence only for brevity)
+                note_parts = provider_entry.notes.split('.')
+                st.caption(note_parts[0] + '.' if note_parts else provider_entry.notes)
 
-    # Show model selectors for direct provider APIs if they're selected
-    selected_provider = st.session_state.selected_provider
-    if selected_provider == 'anthropic' and check_provider_status('anthropic'):
-        st.markdown("")  # Spacing
-        return 'anthropic', create_unified_model_selector('anthropic')
-    elif selected_provider == 'deepseek' and check_provider_status('deepseek'):
-        st.markdown("")  # Spacing
-        return 'deepseek', create_unified_model_selector('deepseek')
-    elif selected_provider == 'opencode_zen':
-        # OpenCodeZen doesn't have models in catalog yet - use env defaults
-        return selected_provider, None
+                # Status badge
+                if is_configured:
+                    st.markdown('<span class="status-pill ready">✓ Ready</span>', unsafe_allow_html=True)
+                else:
+                    st.markdown('<span class="status-pill setup">⚠ Setup Required</span>', unsafe_allow_html=True)
 
-    # No provider selected or not configured
+        # Show model selector if primary provider is selected
+        selected_provider = st.session_state.selected_provider
+        if selected_provider in [p.provider_id for p in primary_providers]:
+            provider_entry = catalog.get_extractor(selected_provider)
+
+            if provider_entry:
+                is_configured = check_provider_status(selected_provider)
+
+                if is_configured and provider_entry.supports_runtime_model:
+                    st.markdown("")  # Spacing
+                    catalog_provider = model_catalog_map.get(selected_provider)
+                    if catalog_provider:
+                        selected_model = create_unified_model_selector(catalog_provider)
+                        return selected_provider, selected_model
+                elif is_configured and not provider_entry.supports_runtime_model:
+                    # Provider doesn't support runtime model (uses default)
+                    return selected_provider, None
+                elif not is_configured:
+                    # Show setup instructions
+                    env_key, url = api_key_map.get(selected_provider, (None, None))
+                    if env_key:
+                        setup_msg = f"💡 **Setup**: Add `{env_key}` to your `.env` file, then restart."
+                        if url:
+                            setup_msg += f"\n\nGet API key: {url}"
+                        st.info(setup_msg)
+                    return selected_provider, None
+
+    # === SECONDARY: Advanced providers (in expander) ===
+    if advanced_providers:
+        st.divider()
+        with st.expander("🔧 Direct Provider APIs (Advanced)", expanded=False):
+            st.caption("Additional providers with direct API access")
+
+            # Show in 2-column grid
+            num_cols = 2
+            rows_needed = (len(advanced_providers) + num_cols - 1) // num_cols
+
+            for row_idx in range(rows_needed):
+                row_cols = st.columns(num_cols)
+
+                for col_idx in range(num_cols):
+                    provider_idx = row_idx * num_cols + col_idx
+                    if provider_idx < len(advanced_providers):
+                        provider_entry = advanced_providers[provider_idx]
+                        provider_id = provider_entry.provider_id
+
+                        with row_cols[col_idx]:
+                            is_configured = check_provider_status(provider_id)
+                            is_selected = st.session_state.selected_provider == provider_id
+
+                            # Get icon
+                            icon = provider_icons.get(provider_id, '🤖')
+
+                            if st.button(
+                                f"{icon} {provider_entry.display_name}",
+                                key=f"provider_adv_{provider_id}",
+                                width="stretch",
+                                type="primary" if is_selected else "secondary"
+                            ):
+                                if st.session_state.selected_provider != provider_id:
+                                    st.session_state.selected_provider = provider_id
+                                    if 'legal_events_df' in st.session_state:
+                                        del st.session_state.legal_events_df
+                                    st.rerun()
+
+                            # Show notes (first sentence)
+                            note_parts = provider_entry.notes.split('.')
+                            st.caption(note_parts[0] + '.' if note_parts else provider_entry.notes)
+
+                            # Status badge
+                            badge = "✅" if is_configured else "⚠️ Setup Required"
+                            st.caption(badge)
+
+        # Show model selectors for advanced providers if selected
+        selected_provider = st.session_state.selected_provider
+        if selected_provider in [p.provider_id for p in advanced_providers]:
+            provider_entry = catalog.get_extractor(selected_provider)
+
+            if provider_entry and check_provider_status(selected_provider):
+                if provider_entry.supports_runtime_model:
+                    st.markdown("")  # Spacing
+                    catalog_provider = model_catalog_map.get(selected_provider)
+                    if catalog_provider:
+                        return selected_provider, create_unified_model_selector(catalog_provider)
+                else:
+                    # Provider doesn't support runtime model (e.g., opencode_zen)
+                    return selected_provider, None
+
+    # No provider selected or not configured - fallback
     return st.session_state.selected_provider, None
 
 
