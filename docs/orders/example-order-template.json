@@ -1,71 +1,105 @@
 {
-  "order_id": "example-order-template",
-  "priority": "reference",
-  "version": "v1.1",
-  "supercontext": {
-    "repository": "docling_langextract_testing",
-    "mission": "Provide contributors with a sample order that clarifies structure and expectations before tackling real tasks."
+  "order_id": "ORD-YYYY-MM-DD-###",
+  "version": "2.0",
+
+  "classification": {
+    "type": "feature|bugfix|refactor|test|docs|infrastructure",
+    "risk_level": "low|medium|high|critical",
+    "estimated_complexity": "trivial|simple|moderate|complex",
+    "requires_human_review": false,
+    "affects_production": false
   },
-  "goal": "Use this template as a guide when drafting new orders so they remain consistent and actionable.",
-  "execution_instructions": [
-    "Read this entire order before touching the codebase.",
-    "Follow every step in sequence. Do not skip a step unless it explicitly tells you to note that it is not needed.",
-    "Review the design mantras in CLAUDE.md (start small, ship value, prefer simple patterns) before planning any changes.",
-    "If any instruction is unclear or impossible (missing file, command fails repeatedly), stop immediately and escalate for clarification."
-  ],
-  "tasks": [
-    {
-      "id": "understand-template",
-      "description": "Confirm you understand the template before creating or executing a real order.",
-      "steps": [
-        "Locate this file at docs/orders/example-order-template.json in your editor.",
-        "Read every section: supercontext, goal, tasks, acceptance criteria, constraints, execution_instructions.",
-        "After reading, add a short note to your working log confirming you understand the structure (e.g., 'Template read on 2025-02-15')."
-      ]
-    },
-    {
-      "id": "tailor-real-orders",
-      "description": "When drafting a new order, customize all placeholders so the task is specific and actionable.",
-      "steps": [
-        "Copy this template into a new JSON file under docs/orders/ with a meaningful order_id (e.g., 'feature-xyz-001').",
-        "Replace the mission, goal, and tasks with the real objective—do not leave generic text.",
-        "For each task, include a \"steps\" array so future agents know exactly what to do.",
-        "Double-check that acceptance criteria map directly to the tasks you listed."
-      ]
-    },
-    {
-      "id": "alignment-check",
-      "description": "Call out documentation expectations and guardrails every time you draft an order.",
-      "steps": [
-        "List which files might need doc updates: README.md, AGENTS.md, docs/*.md, or note 'No documentation updates required' if none apply.",
-        "If docs must change, include the exact file path and a short summary of the expected edit (e.g., 'README.md: add OpenRouter instructions to Quick Start').",
-        "Reference any relevant guardrails (security, configuration, design mantras) so executors know what to revisit before coding.",
-        "Add a reminder in the order to mention documentation results in the final work summary (updated vs. no-change)."
-      ]
-    },
-    {
-      "id": "testing-plan",
-      "description": "Specify the tests that must run after the work is done, including fallback guidance if they cannot run.",
-      "steps": [
-        "Identify the required automated tests. At minimum, list relevant commands such as 'uv run python -m pytest tests/...', 'uv run python tests/run_all_tests.py --quick'.",
-        "If tests depend on credentials (e.g., GEMINI_API_KEY), explicitly call that out.",
-        "When no automated test exists, state the manual verification required (e.g., 'Manual: run streamlit app and confirm dropdown shows OpenRouter').",
-        "Include instructions to record test outcomes or skip reasons in docs/reports/ or the work summary."
-      ]
-    }
-  ],
-  "acceptance_criteria": [
-    "New orders include repository context, explicit goals, sequenced tasks with step-by-step checklists, and measurable acceptance criteria.",
-    "Documentation expectations and testing requirements are spelled out so agents know exactly what to update and run.",
-    "Orders reference the repository guardrails (security, configuration, design mantras) and agents follow escalation guidance when something is unclear."
-  ],
-  "constraints": {
-    "what_not_to_do": [
-      "Do not copy this file verbatim into production orders; always customize details.",
-      "Do not omit acceptance criteria—orders must state how success is evaluated.",
-      "Do not bypass documented toggles, environment variables, or configuration patterns when executing real tasks.",
-      "Do not guess when unsure. Stop and request clarification instead of inventing steps."
+
+  "context": {
+    "problem_statement": "Short, single-sentence description of the issue or opportunity.",
+    "goal": "Single sentence describing the desired end state.",
+    "non_goals": [
+      "Explicitly state what this order will NOT cover."
     ],
-    "escalation_guidance": "If any instruction conflicts with repository guardrails (security, configuration, testing) or cannot be completed, pause work and ask for help before proceeding."
+    "related_orders": ["ORD-2024-01-01-001"]
+  },
+
+  "execution": {
+    "prerequisites": {
+      "tools": ["uv", "pytest"],
+      "environment": ["API_KEY", "DATABASE_URL"],
+      "pre_checks": [
+        "Tests on main branch are green",
+        "No active incidents impacting this component"
+      ]
+    },
+    "tasks": [
+      {
+        "id": "T1",
+        "description": "Atomic task description the agent should execute.",
+        "type": "automated|semi_automated|manual",
+        "estimated_duration": "5m",
+        "validation": "Assertion that proves the task succeeded.",
+        "rollback": "Steps to undo the change if needed.",
+        "depends_on": []
+      },
+      {
+        "id": "T2",
+        "description": "Follow-up task example.",
+        "type": "automated",
+        "estimated_duration": "10m",
+        "validation": "Run test suite, expect all green.",
+        "rollback": "git revert <commit>",
+        "depends_on": ["T1"]
+      }
+    ],
+    "checkpoints": [
+      {
+        "after_task": "T1",
+        "verify": ["Ensure no errors in logs"],
+        "pause_for_review": false
+      }
+    ]
+  },
+
+  "constraints": {
+    "must": [
+      "Maintain backward compatibility",
+      "Update documentation if user-facing behaviour changes"
+    ],
+    "do_not": [
+      "Do not modify production databases directly",
+      "Do not commit secrets"
+    ],
+    "performance": {
+      "max_execution_time": "30m",
+      "max_memory_usage": "2GB",
+      "max_api_calls": 100
+    }
+  },
+
+  "validation": {
+    "acceptance_criteria": [
+      "Feature behaves as specified",
+      "All existing tests pass"
+    ],
+    "testing": [
+      "uv run python -m pytest tests/test_module.py"
+    ],
+    "post_checks": [
+      "Monitor error rates for 15 minutes"
+    ]
+  },
+
+  "metadata": {
+    "created_at": "2025-02-15T10:00:00Z",
+    "updated_at": "2025-02-15T10:00:00Z",
+    "created_by": "agent@company.com",
+    "status": "draft|approved|in_progress|completed|failed|rolled_back"
+  },
+
+  "audit": {
+    "require_approval": true,
+    "approvers": ["senior-engineer@company.com"],
+    "escalation_triggers": [
+      "Unexpected data loss",
+      "Execution time exceeds 2x estimate"
+    ],
+    "fallback": "Rollback changes and notify stakeholders"
   }
 }
