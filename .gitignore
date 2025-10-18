@@ -93,3 +93,11 @@ test_results/
 
 # Timestamped test reports (regenerated on each run)
 tests/test_report_*.json
+
+# Thinking notes and benchmark artifacts
+points_to_ponder.json
+benchmark_results/
+docs/benchmark_reports/
+
+# Git workflow order documentation (ephemeral)
+docs/orders/git-*-*.json
