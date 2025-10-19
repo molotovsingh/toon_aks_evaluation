@@ -16,9 +16,14 @@ load_dotenv()
 from src.ui.streamlit_common import (
     get_pipeline,
     process_documents_with_spinner,
-    create_download_section
+    create_download_section,
+    display_legal_events_table,
 )
 from src.utils.file_handler import FileHandler
+from src.ui.classification_ui import (
+    create_classification_config,
+    show_classification_results
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -62,7 +67,8 @@ st.markdown("""
 }
 
 /* === PROVIDER BUTTON ENHANCEMENTS === */
-/* Style Streamlit buttons to look like modern cards */
+/* NOTE: Using data-testid selectors for Streamlit elements. These are brittle and may break
+   in future Streamlit versions, but are necessary as Streamlit doesn't provide stable CSS classes */
 div[data-testid="column"] > div > div > button {
     background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
     border: 2px solid #e2e8f0 !important;
@@ -80,55 +86,6 @@ div[data-testid="column"] > div > div > button:hover {
     transform: translateY(-1px) !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important;
     border-color: #cbd5e1 !important;
-}
-
-/* Primary (selected) button styling */
-div[data-testid="column"] > div > div > button[kind="primary"] {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-    border: 2px solid #2563eb !important;
-    color: white !important;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4) !important;
-}
-
-div[data-testid="column"] > div > div > button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5) !important;
-}
-
-/* OpenRouter specific styling (first column) */
-div[data-testid="column"]:first-child button[kind="primary"] {
-    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%) !important;
-    border-color: #0284c7 !important;
-    box-shadow: 0 2px 8px rgba(14, 165, 233, 0.4) !important;
-}
-
-div[data-testid="column"]:first-child button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.5) !important;
-}
-
-/* Gemini specific styling (second column) */
-div[data-testid="column"]:nth-child(2) button[kind="primary"] {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-    border-color: #059669 !important;
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4) !important;
-}
-
-div[data-testid="column"]:nth-child(2) button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5) !important;
-}
-
-/* OpenAI specific styling (third column) */
-div[data-testid="column"]:nth-child(3) button[kind="primary"] {
-    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
-    border-color: #6d28d9 !important;
-    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4) !important;
-}
-
-div[data-testid="column"]:nth-child(3) button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%) !important;
-    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.5) !important;
 }
 
 /* === STATUS BADGES === */
@@ -728,14 +685,13 @@ def create_provider_selection():
                 if st.button(
                     f"{icon} {provider_entry.display_name}",
                     key=f"provider_{provider_id}",
-                    width="stretch",
+                    use_container_width=True,
                     type="primary" if is_selected else "secondary"
                 ):
                     if st.session_state.selected_provider != provider_id:
                         st.session_state.selected_provider = provider_id
                         if 'legal_events_df' in st.session_state:
                             del st.session_state.legal_events_df
-                        st.rerun()
 
                 # Show notes/subtitle from catalog (first sentence only for brevity)
                 note_parts = provider_entry.notes.split('.')
@@ -803,14 +759,13 @@ def create_provider_selection():
                             if st.button(
                                 f"{icon} {provider_entry.display_name}",
                                 key=f"provider_adv_{provider_id}",
-                                width="stretch",
+                                use_container_width=True,
                                 type="primary" if is_selected else "secondary"
                             ):
                                 if st.session_state.selected_provider != provider_id:
                                     st.session_state.selected_provider = provider_id
                                     if 'legal_events_df' in st.session_state:
                                         del st.session_state.legal_events_df
-                                    st.rerun()
 
                             # Show notes (first sentence)
                             note_parts = provider_entry.notes.split('.')
@@ -843,7 +798,14 @@ def create_polished_metrics(legal_events_df):
     """Create polished metrics cards with gradients and icons"""
     from src.core.constants import FIVE_COLUMN_HEADERS
 
-    col1, col2, col3, col4 = st.columns(4)
+    # Check if classification is enabled (Document Type column exists)
+    has_classification = 'Document Type' in legal_events_df.columns
+    num_cols = 5 if has_classification else 4
+
+    if has_classification:
+        col1, col2, col3, col4, col5 = st.columns(num_cols)
+    else:
+        col1, col2, col3, col4 = st.columns(num_cols)
 
     with col1:
         total_events = len(legal_events_df)
@@ -897,6 +859,20 @@ def create_polished_metrics(legal_events_df):
             """,
             unsafe_allow_html=True
         )
+
+    # Add 5th column for Document Types (when classification is enabled)
+    if has_classification:
+        with col5:
+            unique_types = legal_events_df['Document Type'].nunique()
+            st.markdown(
+                f"""
+                <div class="metric-card info">
+                    <div class="metric-label">🏷️ Doc Types</div>
+                    <div class="metric-value">{unique_types}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
 
 def create_file_upload_section():
@@ -979,7 +955,7 @@ def create_file_upload_section():
         with st.expander(f"📄 File Details ({len(uploaded_files)} file{'s' if len(uploaded_files) > 1 else ''})", expanded=True):
             import pandas as pd
             summary_df = pd.DataFrame(file_data)
-            st.dataframe(summary_df, width="stretch", hide_index=True)
+            st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
     return uploaded_files
 
@@ -1010,6 +986,25 @@ def main():
 
         st.divider()
 
+        # === CLASSIFICATION LAYER (Layer 1.5) ===
+        st.markdown('<div class="section-header">🏷️ Document Classification (Optional)</div>', unsafe_allow_html=True)
+
+        # Auto-enable if OPENROUTER_API_KEY is configured
+        classification_available = bool(os.getenv('OPENROUTER_API_KEY'))
+
+        enable_classification = st.checkbox(
+            "Enable Document Classification",
+            value=classification_available,
+            help="Classify documents and add Document Type as 6th column. Enables downstream filtering in Excel/database tools."
+        )
+
+        if enable_classification:
+            classification_model, classification_prompt = create_classification_config()
+        else:
+            classification_model, classification_prompt = None, None
+
+        st.divider()
+
         # Pipeline status visualization - shows the complete data flow
         st.markdown('<div class="section-header">📊 Pipeline Status</div>', unsafe_allow_html=True)
         create_pipeline_status(selected_doc_extractor, selected_provider, selected_model)
@@ -1036,7 +1031,7 @@ def main():
 
         # Quick sample document button
         st.markdown('<div class="section-header">⚡ Quick Test</div>', unsafe_allow_html=True)
-        if st.button("📄 Try Sample Document", width="stretch", help="Load the Famas arbitration PDF for testing"):
+        if st.button("📄 Try Sample Document", use_container_width=True, help="Load the Famas arbitration PDF for testing"):
             from pathlib import Path
             sample_path = Path("sample_pdf/famas_dispute/Transaction_Fee_Invoice.pdf")
 
@@ -1082,7 +1077,7 @@ def main():
                 doc_extractor=selected_doc_extractor  # For Layer 1 cost calculation
             )
 
-            if st.button("Process Files", type="primary", width="stretch"):
+            if st.button("Process Files", type="primary", use_container_width=True):
                 # Enhanced status container with context
                 status_container = st.empty()
 
@@ -1112,43 +1107,170 @@ def main():
                 total_size = sum(file_handler.get_file_info(f)['size_mb'] for f in files_to_process)
                 file_count = len(files_to_process)
 
-                # Show processing status with context
-                with status_container:
-                    if total_size > 15:
-                        time_estimate = "⏱️ This may take 1-2 minutes..."
-                    elif total_size > 5:
-                        time_estimate = "⏱️ Estimated time: 30-60 seconds..."
-                    else:
-                        time_estimate = "⚡ Processing..."
+                # === LAYER 1.5: CLASSIFICATION (if enabled) ===
+                # Run classification on ALL documents, store as metadata for 6th column
+                classification_lookup = {}  # {filename: document_type}
 
-                    st.info(
-                        f"🔄 **Processing {file_count} file{'s' if file_count > 1 else ''}** via {provider_display}\n\n"
-                        f"{time_estimate}"
+                if enable_classification and classification_model:
+                    # Show classification status
+                    with status_container:
+                        st.info(f"🏷️ **Classifying {file_count} document{'s' if file_count > 1 else ''}**...")
+
+                    try:
+                        # Import classification factory
+                        from src.core.classification_factory import create_classifier
+                        import tempfile
+                        from pathlib import Path
+
+                        # Create classifier adapter
+                        classifier = create_classifier(classification_model, classification_prompt)
+
+                        # Get pipeline for document extraction (Layer 1)
+                        pipeline = get_pipeline(
+                            provider=selected_provider,
+                            runtime_model=selected_model,
+                            doc_extractor=selected_doc_extractor
+                        )
+
+                        if pipeline is None:
+                            st.error("❌ Failed to initialize pipeline for classification")
+                            status_container.empty()
+                        else:
+                            # Extract and classify all documents
+                            classifications = []
+                            with tempfile.TemporaryDirectory() as temp_dir:
+                                temp_path = Path(temp_dir)
+
+                                with st.spinner(f"📊 Extracting and classifying {file_count} document{'s' if file_count > 1 else ''}..."):
+                                    for idx, file in enumerate(files_to_process, 1):
+                                        try:
+                                            # Reset file position
+                                            if hasattr(file, 'seek'):
+                                                file.seek(0)
+
+                                            # Save and extract (uses cache)
+                                            file_path = file_handler.save_uploaded_file(file, temp_path)
+                                            doc_result = pipeline.document_extractor.extract(file_path)
+
+                                            if not doc_result or not doc_result.plain_text.strip():
+                                                st.warning(f"⚠️ No text extracted from {file.name} - skipping classification")
+                                                classification_lookup[file.name] = "Unknown"
+                                                continue
+
+                                            # Classify document
+                                            classification_result = classifier.classify(
+                                                doc_result.plain_text,
+                                                document_title=file.name
+                                            )
+
+                                            # Store for 6th column
+                                            classification_lookup[file.name] = classification_result['primary']
+
+                                            classifications.append({
+                                                'filename': file.name,
+                                                'type': classification_result['primary'],
+                                                'confidence': classification_result.get('confidence', 0.0),
+                                                'all_labels': classification_result.get('classes', [])
+                                            })
+
+                                            logger.info(
+                                                f"✅ Classified {file.name}: {classification_result['primary']} "
+                                                f"(confidence={classification_result.get('confidence', 0):.2f})"
+                                            )
+
+                                        except Exception as e:
+                                            logger.error(f"❌ Classification failed for {file.name}: {e}")
+                                            st.warning(f"⚠️ Classification failed for {file.name}: {str(e)}")
+                                            classification_lookup[file.name] = "Classification Failed"
+
+                            # Clear status
+                            status_container.empty()
+
+                            # Show classification results (collapsible to reduce clutter)
+                            if classifications:
+                                st.divider()
+                                with st.expander("📊 Classification Results", expanded=False):
+                                    show_classification_results(classifications)
+                                st.divider()
+
+                    except Exception as e:
+                        logger.error(f"❌ Classification layer failed: {e}")
+                        st.error(f"🚨 Classification failed: {str(e)}\n\nProceeding without classification...")
+
+                # === LAYER 2: EVENT EXTRACTION ===
+                if files_to_process:
+                    # Show processing status
+                    with status_container:
+                        if total_size > 15:
+                            time_estimate = "⏱️ This may take 1-2 minutes..."
+                        elif total_size > 5:
+                            time_estimate = "⏱️ Estimated time: 30-60 seconds..."
+                        else:
+                            time_estimate = "⚡ Processing..."
+
+                        st.info(
+                            f"🔄 **Processing {len(files_to_process)} file{'s' if len(files_to_process) > 1 else ''}** via {provider_display}\n\n"
+                            f"{time_estimate}"
+                        )
+
+                    # Process using shared utilities with provider and runtime model
+                    # Pass runtime_model for ALL providers (not just OpenRouter)
+                    legal_events_df = process_documents_with_spinner(
+                        files_to_process,
+                        show_subheader=False,
+                        provider=selected_provider,
+                        runtime_model=selected_model,  # Now works for all providers
+                        doc_extractor=selected_doc_extractor
                     )
 
-                # Process using shared utilities with provider and runtime model
-                # Pass runtime_model for ALL providers (not just OpenRouter)
-                legal_events_df = process_documents_with_spinner(
-                    files_to_process,
-                    show_subheader=False,
-                    provider=selected_provider,
-                    runtime_model=selected_model,  # Now works for all providers
-                    doc_extractor=selected_doc_extractor
-                )
+                    if legal_events_df is not None:
+                        # === ADD CLASSIFICATION AS 6TH COLUMN (if enabled) ===
+                        if enable_classification and classification_lookup:
+                            from src.core.constants import FIVE_COLUMN_HEADERS
 
-                if legal_events_df is not None:
-                    # Store results in session state
-                    st.session_state.legal_events_df = legal_events_df
+                            # Add Document Type column by mapping Document Reference to classification
+                            legal_events_df['Document Type'] = legal_events_df[FIVE_COLUMN_HEADERS[4]].map(
+                                classification_lookup
+                            )
 
-                    # Clear sample document flag after processing
-                    if 'use_sample' in st.session_state:
-                        del st.session_state['use_sample']
+                            # Fill any missing values (shouldn't happen, but defensive)
+                            legal_events_df['Document Type'] = legal_events_df['Document Type'].fillna('Unknown')
 
-                    # Clear processing status
-                    status_container.empty()
+                            logger.info(f"✅ Added Document Type column with {len(classification_lookup)} classifications")
+
+                        # Store results in session state
+                        st.session_state.legal_events_df = legal_events_df
+
+                        # === SAVE METADATA JSON (for analytics ingestion) ===
+                        if 'metadata' in legal_events_df.attrs:
+                            try:
+                                import json
+                                from pathlib import Path
+
+                                metadata_dict = legal_events_df.attrs['metadata']
+                                output_dir = Path("output")
+                                output_dir.mkdir(exist_ok=True)
+
+                                metadata_file = output_dir / f"{metadata_dict['run_id']}_metadata.json"
+                                with open(metadata_file, 'w') as f:
+                                    json.dump(metadata_dict, f, indent=2)
+
+                                logger.info(f"📊 Metadata saved: {metadata_file}")
+                                # st.success(f"📊 Metadata saved: `{metadata_file.name}`")  # Optional: uncomment for user visibility
+                            except Exception as e:
+                                logger.error(f"⚠️ Failed to save metadata: {e}")
+
+                        # Clear sample document flag after processing
+                        if 'use_sample' in st.session_state:
+                            del st.session_state['use_sample']
+
+                        # Clear processing status
+                        status_container.empty()
+                    else:
+                        # Clear processing status (error shown by shared utility)
+                        status_container.empty()
                 else:
-                    # Clear processing status (error shown by shared utility)
-                    status_container.empty()
+                    st.warning("⚠️ No files to process.")
         else:
             st.info("👆 Upload files or try the sample document")
 
@@ -1164,20 +1286,29 @@ def main():
 
         st.markdown("")  # Spacing
 
-        # Display table
+        # Display table (supports optional 6th column: Document Type)
         st.markdown("### 📋 Legal Events Table")
         from src.core.constants import FIVE_COLUMN_HEADERS
+
+        # Build column config dynamically
+        column_config = {
+            FIVE_COLUMN_HEADERS[0]: st.column_config.NumberColumn(FIVE_COLUMN_HEADERS[0], width="small"),
+            FIVE_COLUMN_HEADERS[1]: st.column_config.TextColumn(FIVE_COLUMN_HEADERS[1], width="medium"),
+            FIVE_COLUMN_HEADERS[2]: st.column_config.TextColumn(FIVE_COLUMN_HEADERS[2], width="large"),
+            FIVE_COLUMN_HEADERS[3]: st.column_config.TextColumn(FIVE_COLUMN_HEADERS[3], width="medium"),
+            FIVE_COLUMN_HEADERS[4]: st.column_config.TextColumn(FIVE_COLUMN_HEADERS[4], width="medium")
+        }
+
+        # Add Document Type column config if present
+        if 'Document Type' in legal_events_df.columns:
+            column_config['Document Type'] = st.column_config.TextColumn('Document Type', width="medium")
+            st.caption("💡 Classification enabled - Document Type column shows document categories")
+
         st.dataframe(
             legal_events_df,
-            width="stretch",
+            use_container_width=True,
             hide_index=True,
-            column_config={
-                FIVE_COLUMN_HEADERS[0]: st.column_config.NumberColumn(FIVE_COLUMN_HEADERS[0], width="small"),
-                FIVE_COLUMN_HEADERS[1]: st.column_config.TextColumn(FIVE_COLUMN_HEADERS[1], width="medium"),
-                FIVE_COLUMN_HEADERS[2]: st.column_config.TextColumn(FIVE_COLUMN_HEADERS[2], width="large"),
-                FIVE_COLUMN_HEADERS[3]: st.column_config.TextColumn(FIVE_COLUMN_HEADERS[3], width="medium"),
-                FIVE_COLUMN_HEADERS[4]: st.column_config.TextColumn(FIVE_COLUMN_HEADERS[4], width="medium")
-            }
+            column_config=column_config
         )
 
         # Display performance timing metrics if available
