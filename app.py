@@ -538,6 +538,68 @@ def create_unified_model_selector(provider: str, container=st) -> str:
     return selected
 
 
+def create_gemini_model_selector(container=st) -> str:
+    """
+    Custom Gemini model selector showing 4 options:
+    1. Gemini 2.5 Pro (direct API)
+    2. Gemini 2.5 Flash (direct API)
+    3. Gemini 2.0 Flash (direct API)
+    4. LangExtract (structured few-shot extraction)
+
+    Returns:
+        model_id string (or "langextract" for LangExtract option)
+    """
+    # Build options list: catalog models + LangExtract option
+    options = []
+    display_map = {}
+
+    # Define Gemini models in preferred order: Pro → 2.5 Flash → 2.0 Flash
+    gemini_model_ids = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"]
+
+    # Add Gemini models that exist in catalog
+    for model_id in gemini_model_ids:
+        # Find model in catalog
+        matching_models = [m for m in MODEL_CATALOG if m.model_id == model_id and m.provider == "google"]
+        if matching_models:
+            model = matching_models[0]
+            options.append(model.model_id)
+            display_map[model.model_id] = f"{model.display_name} • {model.format_inline()}"
+
+    # Add LangExtract as special option
+    options.append("langextract")
+    display_map["langextract"] = "LangExtract (Structured Extraction) • Recommended • Free • 1M"
+
+    # Session state key
+    session_key = 'gemini_model'
+
+    # Default: LangExtract (recommended for structured extraction)
+    default_model = os.getenv('GEMINI_MODEL_ID', "langextract")
+
+    if session_key not in st.session_state:
+        st.session_state[session_key] = default_model
+
+    # Ensure default is in options
+    if st.session_state[session_key] not in options:
+        st.session_state[session_key] = "langextract"  # Fallback to LangExtract
+
+    # Selectbox with all 4 options
+    selected = container.selectbox(
+        "Select Model",
+        options=options,
+        index=options.index(st.session_state[session_key]),
+        format_func=lambda x: display_map.get(x, x),
+        key="gemini_selector"
+    )
+
+    # Update session state if changed
+    if selected != st.session_state[session_key]:
+        st.session_state[session_key] = selected
+        if 'legal_events_df' in st.session_state:
+            del st.session_state.legal_events_df
+
+    return selected
+
+
 def create_doc_extractor_selection():
     """Create document extractor selection UI (dynamically generated from registry)"""
     st.markdown('<div class="section-header">📄 Document Processing</div>', unsafe_allow_html=True)
@@ -630,8 +692,10 @@ def create_provider_selection():
         st.session_state.selected_provider = default_provider
 
     # Separate recommended (primary) providers from advanced providers
-    primary_providers = [p for p in enabled_providers if p.recommended]
-    advanced_providers = [p for p in enabled_providers if not p.recommended]
+    # Exclude 'google' provider (internal use only - accessed via langextract model selector)
+    visible_providers = [p for p in enabled_providers if p.provider_id != 'google']
+    primary_providers = [p for p in visible_providers if p.recommended]
+    advanced_providers = [p for p in visible_providers if not p.recommended]
 
     # If fewer than 3 recommended, fill with advanced providers
     if len(primary_providers) < 3:
@@ -713,10 +777,15 @@ def create_provider_selection():
 
                 if is_configured and provider_entry.supports_runtime_model:
                     st.markdown("")  # Spacing
-                    catalog_provider = model_catalog_map.get(selected_provider)
-                    if catalog_provider:
-                        selected_model = create_unified_model_selector(catalog_provider)
+                    # Use custom Gemini selector for langextract provider
+                    if selected_provider == 'langextract':
+                        selected_model = create_gemini_model_selector()
                         return selected_provider, selected_model
+                    else:
+                        catalog_provider = model_catalog_map.get(selected_provider)
+                        if catalog_provider:
+                            selected_model = create_unified_model_selector(catalog_provider)
+                            return selected_provider, selected_model
                 elif is_configured and not provider_entry.supports_runtime_model:
                     # Provider doesn't support runtime model (uses default)
                     return selected_provider, None
@@ -783,9 +852,13 @@ def create_provider_selection():
             if provider_entry and check_provider_status(selected_provider):
                 if provider_entry.supports_runtime_model:
                     st.markdown("")  # Spacing
-                    catalog_provider = model_catalog_map.get(selected_provider)
-                    if catalog_provider:
-                        return selected_provider, create_unified_model_selector(catalog_provider)
+                    # Use custom Gemini selector for langextract provider
+                    if selected_provider == 'langextract':
+                        return selected_provider, create_gemini_model_selector()
+                    else:
+                        catalog_provider = model_catalog_map.get(selected_provider)
+                        if catalog_provider:
+                            return selected_provider, create_unified_model_selector(catalog_provider)
                 else:
                     # Provider doesn't support runtime model (e.g., opencode_zen)
                     return selected_provider, None

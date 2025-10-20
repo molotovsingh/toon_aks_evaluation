@@ -109,6 +109,17 @@ _EVENT_EXTRACTOR_REGISTRY: List[EventExtractorEntry] = [
     ),
 
     EventExtractorEntry(
+        provider_id="google",
+        display_name="Google Gemini (Direct API)",
+        enabled=True,  # Enabled for internal use (adapter switching from langextract)
+        factory_callable="src.core.extractor_factory._create_google_event_extractor",
+        supports_runtime_model=True,  # Supports model_id override (gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro)
+        recommended=False,  # Not recommended in UI - use 'Gemini' provider instead
+        notes="Direct Google Gemini API (internal adapter). Access via 'Gemini' provider with model selector.",
+        documentation_url="https://ai.google.dev/gemini-api/docs",
+    ),
+
+    EventExtractorEntry(
         provider_id="opencode_zen",
         display_name="OpenCode Zen",
         enabled=True,

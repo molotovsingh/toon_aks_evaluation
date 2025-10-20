@@ -175,6 +175,24 @@ class DeepSeekConfig:
 
 
 @dataclass
+class GeminiEventConfig:
+    """Configuration for direct Google Gemini API event extraction
+
+    Alternative to LangExtract for simple chat-completion style extraction.
+    Uses google-generativeai SDK with native JSON mode.
+
+    Default model: gemini-2.0-flash (free tier, 1M context)
+    Ground truth option: gemini-2.5-pro (2M context, pending release)
+    """
+
+    # API settings
+    api_key: str = field(default_factory=lambda: env_str("GEMINI_API_KEY", ""))
+    model_id: str = field(default_factory=lambda: env_str("GEMINI_MODEL_ID", "gemini-2.0-flash"))
+    temperature: float = 0.0
+    max_output_tokens: int = 8192
+
+
+@dataclass
 class ExtractorConfig:
     """Configuration for extractor selection"""
 
@@ -249,11 +267,31 @@ def load_provider_config(
         # Apply runtime model override if needed
         if runtime_model:
             event_config.model = runtime_model
-    else:
-        event_config = LangExtractConfig()
+    elif provider_key == "google":
+        event_config = GeminiEventConfig()
         # Apply runtime model override for Gemini model selection
         if runtime_model:
             event_config.model_id = runtime_model
-        extractor_config.event_extractor = "langextract"
+    else:
+        # Default to langextract (unified Gemini provider)
+
+        # Adapter switching logic for unified Gemini provider:
+        # - If runtime_model is a direct Gemini model ID → use GeminiEventExtractor (simple API)
+        # - If runtime_model is "langextract" or None → use LangExtractEventExtractor (structured)
+        direct_gemini_models = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"]
+
+        if runtime_model in direct_gemini_models:
+            # Switch to direct Google Gemini adapter for simple API access
+            event_config = GeminiEventConfig()
+            event_config.model_id = runtime_model
+            extractor_config.event_extractor = "google"
+        else:
+            # Use LangExtract adapter for structured few-shot extraction
+            event_config = LangExtractConfig()
+            # If runtime_model=="langextract", use default model (gemini-2.5-flash)
+            # Otherwise, apply the runtime_model override (for backward compatibility)
+            if runtime_model and runtime_model != "langextract":
+                event_config.model_id = runtime_model
+            extractor_config.event_extractor = "langextract"
 
     return docling_config, event_config, extractor_config

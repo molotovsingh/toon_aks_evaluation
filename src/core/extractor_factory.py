@@ -177,6 +177,16 @@ def _create_deepseek_event_extractor(
     return DeepSeekEventExtractor(event_config)
 
 
+def _create_google_event_extractor(
+    _doc_config: DoclingConfig,
+    event_config: Any,
+    _extractor_config: ExtractorConfig
+) -> EventExtractor:
+    """Factory for the direct Google Gemini adapter."""
+    from .gemini_adapter import GeminiEventExtractor
+    return GeminiEventExtractor(event_config)
+
+
 def _build_event_provider_registry() -> Dict[str, Callable[[DoclingConfig, Any, ExtractorConfig], EventExtractor]]:
     """
     Build event provider registry dynamically from catalog entries.
