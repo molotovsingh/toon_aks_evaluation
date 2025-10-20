@@ -149,7 +149,7 @@ class LegalEventsExtractor:
             for extraction in extractions:
                 try:
                     # Extract data from centralized client response
-                    attributes = extraction.get('attributes', {})
+                    attributes = extraction.get('attributes') or {}
                     extraction_text = extraction.get('extraction_text', '')
 
                     event_data = {

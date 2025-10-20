@@ -75,7 +75,7 @@ class LangExtractEventExtractor:
             # Convert LangExtract results to EventRecord format
             event_records = []
             for i, extraction in enumerate(extractions, 1):
-                extraction_attributes = extraction.get("attributes", {})
+                extraction_attributes = extraction.get("attributes") or {}
 
                 # Merge LangExtract attributes with additional metadata
                 merged_attributes = extraction_attributes.copy()

@@ -152,7 +152,7 @@ class LegalEventsExtractor:
         """
         # Extract basic information
         extraction_text = extraction.get("extraction_text", "")
-        attributes = extraction.get("attributes", {})
+        attributes = extraction.get("attributes") or {}
 
         # Build event particulars
         event_particulars = extraction_text or attributes.get("event_particulars", DEFAULT_NO_PARTICULARS)
