@@ -4,6 +4,7 @@ Performance and Integration Test Suite
 Tests end-to-end functionality, performance, and data integrity for 5-column table
 
 Run with: GOOGLE_API_KEY=your_key uv run python tests/test_performance_integration.py
+          or: pytest tests/test_performance_integration.py (skips if no API key)
 """
 
 import os
@@ -11,6 +12,7 @@ import sys
 import time
 import pandas as pd
 import logging
+import pytest
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 
@@ -23,6 +25,12 @@ from src.ui.streamlit_common import get_pipeline
 from src.core.table_formatter import TableFormatter
 
 logger = logging.getLogger(__name__)
+
+# Skip all integration tests if API key not available
+pytestmark = pytest.mark.skipif(
+    not (os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY')),
+    reason="Integration tests require GOOGLE_API_KEY or GEMINI_API_KEY environment variable"
+)
 
 
 class PerformanceIntegrationTests:
