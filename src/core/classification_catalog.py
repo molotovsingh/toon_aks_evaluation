@@ -79,13 +79,38 @@ class ClassificationModelEntry:
 
 CLASSIFICATION_MODEL_REGISTRY: List[ClassificationModelEntry] = [
     # === PRIMARY MODELS (ENABLED FOR DEPLOYMENT) ===
+    # Default order: Llama 3.3 70B (OSS, routing/triage) → Claude 3 Haiku (search/discovery)
+
+    ClassificationModelEntry(
+        model_id="meta-llama/llama-3.3-70b-instruct",
+        display_name="Llama 3.3 70B",
+        provider="openrouter",
+        enabled=True,
+        recommended=True,  # DEFAULT for routing/triage (OSS)
+        cost_per_1m=0.60,
+        speed="normal",
+        typical_labels_per_doc="1.0-1.5",
+        multi_label_rate="5-35%",
+        quality_score="10/10",
+        recommended_prompt="decisive",  # Single-label V2 for routing
+        primary_use_case="routing_triage",
+        notes=(
+            "Most accurate. Minimal hedging (5% multi-label with decisive prompt). "
+            "Best for single-label routing decisions and document triage. "
+            "Ranks best for correctness across all test scenarios. "
+            "Open source default."
+        ),
+        documentation_url=None,
+        requires_api_key=True,
+        api_key_env_var="OPENROUTER_API_KEY"
+    ),
 
     ClassificationModelEntry(
         model_id="anthropic/claude-3-haiku",
         display_name="Claude 3 Haiku",
         provider="openrouter",
         enabled=True,
-        recommended=True,  # PRIMARY for search/discovery
+        recommended=True,  # ALTERNATIVE for search/discovery
         cost_per_1m=0.25,
         speed="fast",  # 4.4s benchmark from classification-findings-2025-10-14.md
         typical_labels_per_doc="1.5-2.0",
@@ -99,29 +124,6 @@ CLASSIFICATION_MODEL_REGISTRY: List[ClassificationModelEntry] = [
             "1.90 labels/doc average with comprehensive prompt."
         ),
         documentation_url="https://docs.anthropic.com/en/api",
-        requires_api_key=True,
-        api_key_env_var="OPENROUTER_API_KEY"
-    ),
-
-    ClassificationModelEntry(
-        model_id="meta-llama/llama-3.3-70b-instruct",
-        display_name="Llama 3.3 70B",
-        provider="openrouter",
-        enabled=True,
-        recommended=True,  # PRIMARY for routing/triage
-        cost_per_1m=0.60,
-        speed="normal",
-        typical_labels_per_doc="1.0-1.5",
-        multi_label_rate="5-35%",
-        quality_score="10/10",
-        recommended_prompt="decisive",  # Single-label V2 for routing
-        primary_use_case="routing_triage",
-        notes=(
-            "Most accurate. Minimal hedging (5% multi-label with decisive prompt). "
-            "Best for single-label routing decisions and document triage. "
-            "Ranks best for correctness across all test scenarios."
-        ),
-        documentation_url=None,
         requires_api_key=True,
         api_key_env_var="OPENROUTER_API_KEY"
     ),

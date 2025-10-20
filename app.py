@@ -24,6 +24,13 @@ from src.ui.classification_ui import (
     create_classification_config,
     show_classification_results
 )
+from src.core.config import (
+    OpenRouterConfig,
+    OpenAIConfig,
+    AnthropicConfig,
+    DeepSeekConfig,
+    GeminiEventConfig
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -480,13 +487,13 @@ def create_unified_model_selector(provider: str, container=st) -> str:
     # Session state key based on provider
     session_key = f'{provider}_model'
 
-    # Get default from env or use first model
+    # Get default from env or use config defaults (not first model in catalog)
     env_defaults = {
-        'anthropic': os.getenv('ANTHROPIC_MODEL', filtered[0].model_id),
-        'openai': os.getenv('OPENAI_MODEL', filtered[0].model_id),
-        'google': os.getenv('GEMINI_MODEL_ID', filtered[0].model_id),
-        'openrouter': os.getenv('OPENROUTER_MODEL', filtered[0].model_id),
-        'deepseek': os.getenv('DEEPSEEK_MODEL', filtered[0].model_id)
+        'anthropic': os.getenv('ANTHROPIC_MODEL', AnthropicConfig().model),
+        'openai': os.getenv('OPENAI_MODEL', OpenAIConfig().model),
+        'google': os.getenv('GEMINI_MODEL_ID', GeminiEventConfig().model_id),
+        'openrouter': os.getenv('OPENROUTER_MODEL', OpenRouterConfig().model),
+        'deepseek': os.getenv('DEEPSEEK_MODEL', DeepSeekConfig().model)
     }
     default_model = env_defaults.get(provider, filtered[0].model_id)
 

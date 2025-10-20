@@ -98,12 +98,14 @@ class OpenRouterConfig:
 
     Supports runtime model override for per-request model selection.
     The active_model property returns runtime_model if set, otherwise falls back to env default.
+
+    Default model: openai/gpt-oss-120b (OSS, Apache 2.0, self-hostable)
     """
 
     # API settings
     api_key: str = field(default_factory=lambda: env_str("OPENROUTER_API_KEY", ""))
     base_url: str = field(default_factory=lambda: env_str("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"))
-    model: str = field(default_factory=lambda: env_str("OPENROUTER_MODEL", "openai/gpt-4o-mini"))  # Updated default
+    model: str = field(default_factory=lambda: env_str("OPENROUTER_MODEL", "openai/gpt-oss-120b"))  # OSS default
     timeout: int = field(default_factory=lambda: env_int("OPENROUTER_TIMEOUT", 30))
 
     # Runtime model override (set by UI, takes precedence over env var)
@@ -194,7 +196,12 @@ class GeminiEventConfig:
 
 @dataclass
 class ExtractorConfig:
-    """Configuration for extractor selection"""
+    """Configuration for extractor selection
+
+    Defaults:
+    - Document extractor: docling (local OCR, free, fast)
+    - Event extractor: openrouter (OSS models, flexible, self-hostable)
+    """
 
     # Extractor type selection
     doc_extractor: str = None
@@ -205,7 +212,7 @@ class ExtractorConfig:
         if self.doc_extractor is None:
             self.doc_extractor = env_str("DOC_EXTRACTOR", "docling")
         if self.event_extractor is None:
-            self.event_extractor = env_str("EVENT_EXTRACTOR", "langextract")
+            self.event_extractor = env_str("EVENT_EXTRACTOR", "openrouter")  # OSS default
 
 
 def load_config() -> Tuple[DoclingConfig, LangExtractConfig, ExtractorConfig]:
