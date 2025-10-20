@@ -659,7 +659,7 @@ def display_legal_events_table(legal_events_df: pd.DataFrame) -> None:
     # Display table with standardized column configuration
     st.dataframe(
         legal_events_df,
-        width='stretch',
+        use_container_width=True,
         hide_index=True,
         column_config={
             FIVE_COLUMN_HEADERS[0]: st.column_config.NumberColumn(FIVE_COLUMN_HEADERS[0], width="small"),
@@ -776,7 +776,7 @@ def show_sample_table_format() -> None:
 
     from ..core.table_formatter import TableFormatter
     sample_df = TableFormatter.create_fallback_dataframe("Sample - no files uploaded yet")
-    st.dataframe(sample_df, width='stretch', hide_index=True)
+    st.dataframe(sample_df, use_container_width=True, hide_index=True)
 
 
 # ====================

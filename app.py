@@ -1186,6 +1186,18 @@ def main():
                             # Clear status
                             status_container.empty()
 
+                            # Defensive logging: Check classification results
+                            if len(classification_lookup) == 0:
+                                logger.warning(
+                                    f"⚠️ Classification completed but no files were classified. "
+                                    f"Processed {file_count} files but classification_lookup is empty."
+                                )
+                            else:
+                                logger.info(
+                                    f"✅ Classification completed: {len(classification_lookup)} files classified "
+                                    f"out of {file_count} processed"
+                                )
+
                             # Show classification results (collapsible to reduce clutter)
                             if classifications:
                                 st.divider()
@@ -1225,7 +1237,7 @@ def main():
 
                     if legal_events_df is not None:
                         # === ADD CLASSIFICATION AS 6TH COLUMN (if enabled) ===
-                        if enable_classification and classification_lookup:
+                        if enable_classification and len(classification_lookup) > 0:
                             from src.core.constants import FIVE_COLUMN_HEADERS
 
                             # Add Document Type column by mapping Document Reference to classification
@@ -1237,6 +1249,18 @@ def main():
                             legal_events_df['Document Type'] = legal_events_df['Document Type'].fillna('Unknown')
 
                             logger.info(f"✅ Added Document Type column with {len(classification_lookup)} classifications")
+                        elif enable_classification and len(classification_lookup) == 0:
+                            # Classification was enabled but no files were classified
+                            logger.warning("⚠️ Classification enabled but no files were classified - column not added")
+                            st.warning(
+                                "⚠️ **Classification Enabled But No Results**\n\n"
+                                "Classification was enabled but no documents were classified. "
+                                "The Document Type column was not added.\n\n"
+                                "**Possible causes**:\n"
+                                "- Files may have been cleared before processing\n"
+                                "- Classification pipeline initialization failed\n"
+                                "- Check logs for classification errors"
+                            )
 
                         # Store results in session state
                         st.session_state.legal_events_df = legal_events_df
