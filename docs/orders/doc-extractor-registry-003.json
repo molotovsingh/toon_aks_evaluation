@@ -1,0 +1,135 @@
+{
+  "order_id": "doc-extractor-registry-003",
+  "version": "2.0",
+
+  "classification": {
+    "type": "refactor",
+    "risk_level": "medium",
+    "estimated_complexity": "moderate",
+    "requires_human_review": true,
+    "affects_production": true
+  },
+
+  "context": {
+    "problem_statement": "The catalog now stores document extractor metadata (pricing, prompts, enabled flag), but the extractor factory still holds a static map and the CLI/tests don’t enforce enable/disable behaviour consistently.",
+    "goal": "Make the catalog the single source of truth while keeping factory logic in code: bootstrapping the factory map from catalog entries, adding integration coverage for enable/disable, and documenting the workflow for adding new extractors.",
+    "non_goals": [
+      "Automatically generate extractor code from metadata",
+      "Reintroduce Gemini vision or change event extractor behaviour"
+    ],
+    "related_orders": [
+      "doc-extractor-registry-001",
+      "remove-gemini-vision-001"
+    ]
+  },
+
+  "execution": {
+    "prerequisites": {
+      "tools": ["uv"],
+      "environment": [],
+      "pre_checks": [
+        "Tests on main are green"
+      ]
+    },
+    "tasks": [
+      {
+        "id": "T1",
+        "description": "Add optional `factory_callable` to DocExtractorEntry and bootstrap the factory map by resolving these callables for enabled entries.",
+        "type": "automated",
+        "estimated_duration": "30m",
+        "validation": "DocExtractorEntry includes `factory_callable` (fully-qualified import path). Populate values for built-ins: docling → `src.core.extractor_factory._create_docling_document_extractor`, qwen_vl → `src.core.extractor_factory._create_qwen_vl_document_extractor`. ExtractorFactory builds its registry by dynamically importing only whitelisted modules (e.g., `src.core.*`); invalid/missing entries are logged and skipped; Docling remains a safe default.",
+        "rollback": "Revert catalog/factory changes.",
+        "depends_on": []
+      },
+      {
+        "id": "T2",
+        "description": "Ensure CLI and cost estimator derive extractor availability solely from the catalog (no hardcoded fallbacks).",
+        "type": "automated",
+        "estimated_duration": "20m",
+        "validation": "`scripts/classify_documents.py --help` lists only enabled entries from the catalog. Add optional `--doc-extractor` (backward compatible): default to `DOC_EXTRACTOR` env or first enabled entry (typically Docling). If a selected extractor is disabled or missing credentials (e.g., OpenRouter API key), the CLI emits a clear warning and exits gracefully. Cost estimator shows only enabled extractors.",
+        "rollback": "Revert CLI/estimator edits.",
+        "depends_on": ["T1"]
+      },
+      {
+        "id": "T3",
+        "description": "Add integration tests for enable/disable flows.",
+        "type": "automated",
+        "estimated_duration": "25m",
+        "validation": "Tests toggle `enabled` for an extractor (e.g., via monkeypatch) and assert factory creation, CLI choices, and UI helper filtering honour the flag.",
+        "rollback": "Revert test changes.",
+        "depends_on": ["T1", "T2"]
+      },
+      {
+        "id": "T4",
+        "description": "Document the workflow for adding or disabling document extractors.",
+        "type": "automated",
+        "estimated_duration": "15m",
+        "validation": "README/AGENTS/docs reference catalog entries, explain `factory_callable`, and outline the steps: implement adapter + factory, register via catalog, flip `enabled`.",
+        "rollback": "Revert documentation changes.",
+        "depends_on": ["T1", "T2"]
+      }
+    ],
+    "checkpoints": [
+      {
+        "after_task": "T2",
+        "verify": [
+          "CLI lists the same extractors as Streamlit",
+          "Disabling Qwen-VL (enabled=False) hides it everywhere without code edits"
+        ],
+        "pause_for_review": false
+      }
+    ]
+  },
+
+  "constraints": {
+    "must": [
+      "Factory callables live in code; catalog only references them",
+      "Environment overrides (`DOC_EXTRACTOR`) continue to work",
+      "Docling and Qwen-VL pipelines keep passing existing tests",
+      "Dynamic import is restricted to a whitelist (e.g., `src.core.*`) and failures are logged and skipped"
+    ],
+    "do_not": [
+      "Do not leave dead Gemini references",
+      "Do not duplicate extractor metadata outside the catalog"
+    ],
+    "performance": {
+      "max_execution_time": "45m",
+      "max_memory_usage": "2GB",
+      "max_api_calls": 0
+    }
+  },
+
+  "validation": {
+    "acceptance_criteria": [
+      "ExtractorFactory builds its registry from catalog `factory_callable` entries",
+      "CLI/cost estimator list only enabled extractors",
+      "Tests cover enable/disable flows across factory, CLI, and UI helpers",
+      "Docs explain the add/remove workflow"
+    ],
+    "testing": [
+      "uv run python -m pytest -q"
+    ],
+    "post_checks": [
+      "Run Streamlit UI (which already uses the catalog) and confirm only enabled extractors appear",
+      "Run Streamlit UI and CLI with Qwen-VL disabled to confirm it disappears without code edits",
+      "Re-enable Qwen-VL and confirm both flows detect the change"
+    ]
+  },
+
+  "metadata": {
+    "created_at": "2025-02-15T13:00:00Z",
+    "updated_at": "2025-02-15T13:00:00Z",
+    "created_by": "agent@company.com",
+    "status": "draft"
+  },
+
+  "audit": {
+    "require_approval": true,
+    "approvers": ["tech-lead@company.com"],
+    "escalation_triggers": [
+      "Dynamic import introduces runtime failures",
+      "Enable/disable tests reveal regressions in Docling or Qwen-VL flows"
+    ],
+    "fallback": "Revert to static factory map if dynamic bootstrapping causes instability"
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "order_id": "event-extractor-registry-003",
+  "version": "2.0",
+
+  "classification": {
+    "type": "feature",
+    "risk_level": "medium",
+    "estimated_complexity": "moderate",
+    "requires_human_review": true,
+    "affects_production": true
+  },
+
+  "context": {
+    "problem_statement": "Stage 2 (event extraction) still mixes provider lists across factory/UI/CLI. We want a single registry that controls availability and prompt/config overrides without duplicating per-model pricing.",
+    "goal": "Introduce an event-extractor registry (mirroring the document layer) that: (1) lists providers with enabled flags and prompt/config overrides, (2) references factory callables for dynamic factory bootstrap, and (3) keeps pricing in the Model Catalog.",
+    "non_goals": [
+      "Do not move per-model pricing out of src/core/model_catalog.py",
+      "Do not change document extractor behaviour"
+    ],
+    "related_orders": [
+      "doc-extractor-registry-003",
+      "event-extractor-001"
+    ]
+  },
+
+  "execution": {
+    "prerequisites": {
+      "tools": ["uv"],
+      "environment": [],
+      "pre_checks": ["Tests on main are green"]
+    },
+    "tasks": [
+      {
+        "id": "T1",
+        "description": "Define the event-extractor registry schema with fields: provider_id, display_name, enabled, factory_callable (import path), prompt_id|prompt_override, supports_runtime_model.",
+        "type": "automated",
+        "estimated_duration": "20m",
+        "validation": "Schema documented and module created at src/core/event_extractor_catalog.py with get_event_extractor_catalog(), list_event_extractors(), get_prompt() mirroring the doc layer.",
+        "rollback": "Revert schema file.",
+        "depends_on": []
+      },
+      {
+        "id": "T2",
+        "description": "Implement the registry and populate entries for existing providers with factory_callable references.",
+        "type": "automated",
+        "estimated_duration": "30m",
+        "validation": "Entries added with explicit factory_callable examples: langextract → src.core.extractor_factory._create_langextract_event_extractor; openrouter → src.core.extractor_factory._create_openrouter_event_extractor; openai → src.core.extractor_factory._create_openai_event_extractor; anthropic → src.core.extractor_factory._create_anthropic_event_extractor; deepseek → src.core.extractor_factory._create_deepseek_event_extractor; opencode_zen → src.core.extractor_factory._create_opencode_zen_event_extractor. Pricing remains in the Model Catalog.",
+        "rollback": "Revert registry module.",
+        "depends_on": ["T1"]
+      },
+      {
+        "id": "T3",
+        "description": "Refactor factory/UI/CLI to bootstrap from the registry and honour `enabled` gates.",
+        "type": "automated",
+        "estimated_duration": "45m",
+        "validation": "ExtractorFactory dynamically imports only whitelisted callables (src.core.* via importlib), logs+skips invalid entries, and defaults to LangExtract. Streamlit provider buttons iterate enabled registry entries (no hardcoded lists). CLI keeps the existing --provider flag and lists only enabled entries; selecting a disabled/misconfigured provider yields a clear error and exits non-zero (e.g., code 2).",
+        "rollback": "Revert integration.",
+        "depends_on": ["T2"]
+      },
+      {
+        "id": "T4",
+        "description": "Preserve and test runtime model override flows for providers that support it (OpenRouter/OpenAI/Anthropic).",
+        "type": "automated",
+        "estimated_duration": "25m",
+        "validation": "Add tests (e.g., tests/test_event_extractor_registry.py): (1) credential guard — OpenRouter without OPENROUTER_API_KEY emits setup/exit; (2) runtime_model override — load_provider_config propagates to adapter init for OpenRouter/OpenAI/Anthropic; (3) enable/disable — toggling registry hides providers in factory/CLI/UI. Pricing remains sourced from Model Catalog.",
+        "rollback": "Revert test changes.",
+        "depends_on": ["T3"]
+      },
+      {
+        "id": "T5",
+        "description": "Document the provider add/disable workflow and the separation of concerns (registry vs model catalog).",
+        "type": "automated",
+        "estimated_duration": "15m",
+        "validation": "README/AGENTS/docs updated: add adapter+factory → add registry entry with factory_callable → test with enabled=false → enable. State import whitelist and fallback behaviour.",
+        "rollback": "Revert docs.",
+        "depends_on": ["T3", "T4"]
+      }
+    ],
+    "checkpoints": [
+      {
+        "after_task": "T3",
+        "verify": [
+          "Streamlit and CLI list the same providers from the registry",
+          "Disabling a provider hides it everywhere without code edits"
+        ],
+        "pause_for_review": false
+      }
+    ]
+  },
+
+  "constraints": {
+    "must": [
+      "Dynamic import restricted to whitelist (e.g., src.core.*) via importlib; failures log+skip",
+      "LangExtract remains safe default when no providers enabled",
+      "Pricing continues to come from src/core/model_catalog.py"
+    ],
+    "do_not": [
+      "Do not duplicate or move per-model pricing",
+      "Do not regress credential validation or error handling",
+      "Do not use eval/exec for dynamic loading"
+    ],
+    "performance": {
+      "max_execution_time": "60m",
+      "max_memory_usage": "2GB",
+      "max_api_calls": 0
+    }
+  },
+
+  "validation": {
+    "acceptance_criteria": [
+      "Factory, UI, and CLI derive providers from the registry with enabled gating (Streamlit buttons iterate registry entries)",
+      "Runtime model overrides still propagate correctly",
+      "Docs explain how to add/disable providers and why pricing stays in the Model Catalog"
+    ],
+    "testing": [
+      "uv run python -m pytest -q"
+    ],
+    "post_checks": [
+      "Toggle a provider to enabled=false and confirm it disappears in Streamlit and CLI (no code edits)",
+      "Set runtime_model for OpenRouter/OpenAI and verify it flows to the adapter",
+      "With missing credentials (e.g., OPENROUTER_API_KEY), verify Streamlit shows 'Setup Required' and CLI exits non-zero"
+    ]
+  },
+
+  "metadata": {
+    "created_at": "2025-02-15T13:15:00Z",
+    "updated_at": "2025-02-15T13:15:00Z",
+    "created_by": "agent@company.com",
+    "status": "draft"
+  },
+
+  "audit": {
+    "require_approval": true,
+    "approvers": ["tech-lead@company.com"],
+    "escalation_triggers": [
+      "Dynamic import failures in production",
+      "Regression in runtime_model handling"
+    ],
+    "fallback": "Revert to current provider-specific wiring if registry refactor causes instability"
+  }
+}

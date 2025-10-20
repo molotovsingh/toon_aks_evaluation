@@ -1,0 +1,141 @@
+{
+  "order_id": "event-extractor-registry-002",
+  "version": "2.0",
+
+  "classification": {
+    "type": "feature",
+    "risk_level": "medium",
+    "estimated_complexity": "moderate",
+    "requires_human_review": true,
+    "affects_production": true
+  },
+
+  "context": {
+    "problem_statement": "Stage 2 (event extraction) still has scattered provider logic; adding/removing providers requires touching config, factory, prompts, UI, and documentation manually.",
+    "goal": "Introduce a centralized event-extractor registry (mirroring the document-extractor registry) so providers, prompts, and pricing become plug-and-play.",
+    "non_goals": [
+      "Change document extractor behaviour (handled by doc-extractor-registry-001)",
+      "Implement new providers beyond those already supported (LangExtract, OpenRouter, OpenCode Zen, OpenAI, Anthropic, DeepSeek)"
+    ],
+    "related_orders": [
+      "doc-extractor-registry-001",
+      "event-extractor-001"
+    ]
+  },
+
+  "execution": {
+    "prerequisites": {
+      "tools": ["uv"],
+      "environment": [],
+      "pre_checks": [
+        "Tests on main are green"
+      ]
+    },
+    "tasks": [
+      {
+        "id": "T1",
+        "description": "Define the event-extractor registry schema with metadata, enable flags, and prompt/config overrides.",
+        "type": "automated",
+        "estimated_duration": "20m",
+        "validation": "Schema documented (fields for provider id, display name, enabled, runtime model support, prompt settings, pricing info).",
+        "rollback": "Revert schema draft.",
+        "depends_on": []
+      },
+      {
+        "id": "T2",
+        "description": "Implement the registry module and migrate current providers.",
+        "type": "automated",
+        "estimated_duration": "40m",
+        "validation": "Module (e.g., src/core/event_extractor_catalog.py) exposes registry accessors; all existing providers are represented with enabled=true and existing config copied in.",
+        "rollback": "Revert registry module.",
+        "depends_on": ["T1"]
+      },
+      {
+        "id": "T3",
+        "description": "Refactor extractor factory, pipeline, UI, and CLI to consume the registry.",
+        "type": "automated",
+        "estimated_duration": "45m",
+        "validation": "ExtractorFactory pulls providers from registry; Streamlit provider buttons iterate enabled entries; CLI help/options render from registry; no hardcoded provider lists remain.",
+        "rollback": "Revert integration changes.",
+        "depends_on": ["T2"]
+      },
+      {
+        "id": "T4",
+        "description": "Support provider-specific prompts and pricing info via the registry.",
+        "type": "automated",
+        "estimated_duration": "30m",
+        "validation": "Registry entries can specify prompt template IDs / runtime model defaults; cost estimator and UI leverage registry pricing fields; tests confirm overrides load correctly (e.g., OpenRouter vs Anthropic).",
+        "rollback": "Revert prompt/pricing integrations.",
+        "depends_on": ["T3"]
+      },
+      {
+        "id": "T5",
+        "description": "Update docs, tests, and environment templates to describe registry-driven configuration.",
+        "type": "automated",
+        "estimated_duration": "25m",
+        "validation": "README/AGENTS/docs/ordering docs describe the registry; .env.example lists provider env vars; tests cover registry access and ensure toggling `enabled` hides providers.",
+        "rollback": "Revert doc/test changes.",
+        "depends_on": ["T3", "T4"]
+      }
+    ],
+    "checkpoints": [
+      {
+        "after_task": "T3",
+        "verify": [
+          "`uv run streamlit run app.py` shows providers sourced from registry",
+          "CLI `--provider` flag lists the same set"
+        ],
+        "pause_for_review": false
+      }
+    ]
+  },
+
+  "constraints": {
+    "must": [
+      "Registry exposes an `enabled` flag to gate providers at runtime",
+      "Existing provider behaviour (LangExtract default, runtime_model overrides) remains intact",
+      "Environment variable overrides continue to work (EVENT_EXTRACTOR, provider-specific keys)"
+    ],
+    "do_not": [
+      "Do not regress credential validation or error handling",
+      "Do not remove provider-specific capabilities (e.g., OpenRouter multi-model support)"
+    ],
+    "performance": {
+      "max_execution_time": "60m",
+      "max_memory_usage": "2GB",
+      "max_api_calls": 0
+    }
+  },
+
+  "validation": {
+    "acceptance_criteria": [
+      "Single registry drives event extractor availability, prompts, pricing, and UI/CLI listings",
+      "Tests cover registry access, enable/disable flows, and prompt overrides",
+      "Docs/env templates teach how to toggle providers via registry"
+    ],
+    "testing": [
+      "uv run python -m pytest tests/test_cost_estimator.py -v"
+    ],
+    "post_checks": [
+      "Run Streamlit and toggle providers to confirm registry settings propagate (buttons, prompts, pricing)",
+      "Ensure CLI `--provider` options update automatically after registry change"
+    ]
+  },
+
+  "metadata": {
+    "created_at": "2025-02-15T12:30:00Z",
+    "updated_at": "2025-02-15T12:30:00Z",
+    "created_by": "agent@company.com",
+    "status": "draft"
+  },
+
+  "audit": {
+    "require_approval": true,
+    "approvers": ["tech-lead@company.com"],
+    "escalation_triggers": [
+      "Registry design conflicts with existing adapter interfaces",
+      "Refactor breaks runtime_model overrides or provider-specific prompts"
+    ],
+    "fallback": "Revert to current provider-specific code if registry refactor causes instability"
+  }
+}
