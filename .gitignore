@@ -57,6 +57,10 @@ output/
 *.csv
 *.pdf
 
+# DuckDB database files
+*.duckdb
+*.duckdb.wal
+
 # Exception: Track test PDFs in sample_pdf directory
 !sample_pdf/**/*.pdf
 !sample_pdf/**/*.docx

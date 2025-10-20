@@ -7,13 +7,14 @@ Core Docling-to-legal-events pipeline lives under `src/core/`; `extractor_factor
 - `uv sync` installs pinned dependencies from `pyproject.toml` and `uv.lock`.
 - `uv run streamlit run app.py` boots the primary UI; swap in `examples/*.py` to explore demos.
 - `uv run python src/main.py` executes the CLI harness for scripted LangExtract runs.
-- `uv run python tests/run_all_tests.py --quick` runs the smoke suite; drop `--quick` for full coverage or target pytest modules.
+- `uv run python tests/run_all_tests.py --quick` runs the smoke suite; drop `--quick` for full coverage.
+- `uv run pytest tests/test_specific_file.py` runs a single test file; use `::test_function` for specific tests.
 
 ## Coding Style & Naming Conventions
-Use 4-space indentation, Python type hints, and docstrings aligned with `src/core/interfaces.py`. Prefer `snake_case` for functions, `PascalCase` for classes, and ALL_CAPS for constants. Centralize event schema constants in `src/core/constants.py`, and expose configuration through dataclasses instead of hard-coded literals. Break complex Streamlit callbacks into helpers to keep UI logic legible.
+Use 4-space indentation, Python type hints, and docstrings aligned with `src/core/interfaces.py`. Prefer `snake_case` for functions, `PascalCase` for classes, and ALL_CAPS for constants. Centralize event schema constants in `src/core/constants.py`, and expose configuration through dataclasses instead of hard-coded literals. Break complex Streamlit callbacks into helpers to keep UI logic legible. Import standard library first, then third-party, then local imports. Handle errors with try/except blocks and log failures; avoid silent failures.
 
 ## Testing Guidelines
-Write tests under `tests/` with filenames like `test_*.py`, tagging acceptance IDs (for example, `AC-00X`) in logs. Provider-specific suites skip automatically when API keys are missing; mock provider responses for unit coverage. Capture verification artifacts with `uv run python tests/run_all_tests.py --report` when preparing evidence.
+Write tests under `tests/` with filenames like `test_*.py`, tagging acceptance IDs (for example, `AC-00X`) in logs. Provider-specific suites skip automatically when API keys are missing; mock provider responses for unit coverage. Use pytest fixtures for setup/teardown. Capture verification artifacts with `uv run python tests/run_all_tests.py --report` when preparing evidence.
 
 ## Commit & Pull Request Guidelines
 Compose present-tense, task-focused commits (for example, "Add Docling adapter metrics") and group related pipeline changes together. Reference acceptance IDs, executed scripts, or test commands in commit bodies. Pull requests should summarize behavioral changes, link tracking issues, and include UI screenshots or terminal captures when relevant. Remove temporary debug assets before requesting review.
