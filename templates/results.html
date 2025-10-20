@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Legal Events Results</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f5f5f5; }
+        .back-link { margin-bottom: 20px; }
+        .back-link a { color: #007bff; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="back-link">
+            <a href="/">← Back to Upload</a>
+        </div>
+
+        <h1>Legal Events Results</h1>
+
+        <!-- Results Status Indicator -->
+        <div class="results-status" style="margin: 20px 0; padding: 15px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 5px; color: #0c5460;">
+            <strong>📊 Processing Complete</strong> - Successfully extracted {{ count }} legal events from your documents.
+            <br><small>Run ID: <strong>{{ run_id }}</strong> | Provider: {{ metadata.provider or 'Unknown' }} | Model: {{ metadata.model or 'Default' }}</small>
+            {% if count > 0 %}
+            <br><small>Results are ready for automatic download below.</small>
+            {% else %}
+            <br><small>No legal events were found in the uploaded documents.</small>
+            {% endif %}
+        </div>
+
+        <p>Found {{ count }} legal events</p>
+
+        {% if results %}
+        <table>
+            <thead>
+                <tr>
+                    {% for col in columns %}
+                    <th>{{ col }}</th>
+                    {% endfor %}
+                    {% if 'Document Type' in columns %}
+                    <th>Document Type</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in results %}
+                <tr>
+                    {% for col in columns %}
+                    <td>{{ row[col] if row[col] else '-' }}</td>
+                    {% endfor %}
+                    {% if 'Document Type' in columns %}
+                    <td>{{ row['Document Type'] if row['Document Type'] else '-' }}</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if 'Document Type' in columns %}
+        <div style="margin-top: 10px; padding: 10px; background: #e7f3ff; border-radius: 3px; border-left: 3px solid #007bff;">
+            <small style="color: #0066cc;">💡 <strong>Classification enabled:</strong> Document Type column shows AI-classified document categories for better organization and filtering.</small>
+        </div>
+
+        <!-- Classification Results Section -->
+        <div style="margin-top: 20px; padding: 20px; background: #f0f9ff; border-radius: 5px; border: 1px solid #bae6fd;">
+            <h4 style="margin-top: 0; color: #0369a1;">📊 Document Classification Results</h4>
+            <p style="margin-bottom: 15px; color: #0c4a6e;">Detailed classification information for each processed document:</p>
+
+            <div style="display: grid; gap: 10px;">
+                {% set classifications = metadata.get('classifications', []) %}
+                {% if classifications %}
+                    {% for classification in classifications %}
+                    <div style="padding: 12px; background: white; border-radius: 4px; border: 1px solid #e0f2fe; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong style="color: #0369a1;">{{ classification.filename }}</strong>
+                            <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 12px; font-size: 0.9em; margin-left: 10px;">
+                                {{ classification.type }}
+                            </span>
+                        </div>
+                        <div style="text-align: right;">
+                            {% if classification.confidence %}
+                            <small style="color: #64748b;">Confidence: {{ "%.1f"|format(classification.confidence * 100) }}%</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div style="padding: 12px; background: white; border-radius: 4px; border: 1px solid #e0f2fe; color: #64748b;">
+                        No detailed classification results available.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Automatic Download Section -->
+        <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6;">
+            <h3 style="margin-top: 0; color: #495057;">📥 Download Results</h3>
+            <p style="margin-bottom: 15px; color: #6c757d;">Download your legal events extraction results as a CSV file.</p>
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="/download/{{ run_id }}" class="download-btn" style="display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: 500;">
+                    📊 Download CSV (Run {{ run_id }})
+                </a>
+
+                <button onclick="copyRunId()" class="copy-btn" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 500;">
+                    📋 Copy Run ID
+                </button>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <small style="color: #6c757d;">
+                    <strong>File Details:</strong> Run ID {{ run_id }} |
+                    {{ metadata.file_count or 0 }} files processed |
+                    Generated {{ metadata.timestamp or 'Unknown' }}
+                </small>
+            </div>
+        </div>
+
+        <script>
+            function copyRunId() {
+                navigator.clipboard.writeText('{{ run_id }}').then(function() {
+                    // Show temporary success message
+                    const btn = document.querySelector('.copy-btn');
+                    const originalText = btn.textContent;
+                    btn.textContent = '✅ Copied!';
+                    btn.style.background = '#28a745';
+                    setTimeout(function() {
+                        btn.textContent = originalText;
+                        btn.style.background = '#6c757d';
+                    }, 2000);
+                }).catch(function(err) {
+                    console.error('Failed to copy: ', err);
+                });
+            }
+        </script>
+
+        {% else %}
+        <p>No results found.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
