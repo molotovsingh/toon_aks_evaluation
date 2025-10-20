@@ -52,6 +52,21 @@ class LegalEventsPipeline:
             'env_vars': ['OPENCODEZEN_API_KEY'],
             'primary_key': 'OPENCODEZEN_API_KEY',
             'description': 'OpenCode Zen legal extraction service'
+        },
+        'openai': {
+            'env_vars': ['OPENAI_API_KEY'],
+            'primary_key': 'OPENAI_API_KEY',
+            'description': 'OpenAI API for GPT models'
+        },
+        'anthropic': {
+            'env_vars': ['ANTHROPIC_API_KEY'],
+            'primary_key': 'ANTHROPIC_API_KEY',
+            'description': 'Anthropic API for Claude models'
+        },
+        'deepseek': {
+            'env_vars': ['DEEPSEEK_API_KEY'],
+            'primary_key': 'DEEPSEEK_API_KEY',
+            'description': 'DeepSeek API for DeepSeek-Chat models'
         }
     }
 
