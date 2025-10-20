@@ -153,6 +153,26 @@ _MODEL_REGISTRY: List[ModelEntry] = [
     ),
 
     ModelEntry(
+        provider="google",
+        model_id="gemini-2.5-flash",
+        display_name="Gemini 2.5 Flash",
+        tier=ModelTier.PRODUCTION,
+        category="Production",
+        status=ModelStatus.STABLE,
+        cost_input_per_1m=0.0,  # Free tier (as of June 2025)
+        cost_output_per_1m=0.0,
+        cost_display="Free",
+        context_window=1000000,
+        context_display="1M",
+        supports_json_mode=True,
+        quality_score="9/10",
+        badges=["Recommended", "Free", "1M Context"],
+        recommended=True,
+        documentation_url="https://ai.google.dev/gemini-api/docs/models/gemini-v2",
+        notes="Google's recommended model for LangExtract (GA since June 2025). Fast, accurate, budget-friendly."
+    ),
+
+    ModelEntry(
         provider="anthropic",
         model_id="claude-opus-4",
         display_name="Claude Opus 4",
@@ -358,6 +378,50 @@ _MODEL_REGISTRY: List[ModelEntry] = [
         documentation_url="https://openrouter.ai/models/mistralai/mistral-large-2411",
         notes="European alternative to US providers. Good GDPR compliance story."
     ),
+
+    # === GEMINI MODELS VIA OPENROUTER ===
+
+    ModelEntry(
+        provider="openrouter",
+        model_id="google/gemini-2.5-pro",
+        display_name="Gemini 2.5 Pro (OpenRouter)",
+        tier=ModelTier.TIER_2,
+        category="Ground Truth",
+        status=ModelStatus.PLACEHOLDER,
+        cost_input_per_1m=None,  # TBD - pricing not yet announced
+        cost_output_per_1m=None,
+        cost_display="$TBD",
+        context_window=2000000,
+        context_display="2M",
+        supports_json_mode=True,
+        quality_score=None,  # Not yet benchmarked
+        badges=["Tier 2", "2M Context"],
+        recommended=False,
+        documentation_url="https://openrouter.ai/models/google/gemini-2.5-pro",
+        notes="Gemini 2.5 Pro via OpenRouter unified API. Alternative to direct Google/LangExtract."
+    ),
+
+    ModelEntry(
+        provider="openrouter",
+        model_id="google/gemini-2.0-flash",
+        display_name="Gemini 2.0 Flash (OpenRouter)",
+        tier=ModelTier.PRODUCTION,
+        category="Production",
+        status=ModelStatus.STABLE,
+        cost_input_per_1m=0.0,  # Free tier via OpenRouter
+        cost_output_per_1m=0.0,
+        cost_display="Free",
+        context_window=1000000,
+        context_display="1M",
+        supports_json_mode=True,
+        quality_score="8/10",
+        badges=["Free", "1M Context"],
+        recommended=True,
+        documentation_url="https://openrouter.ai/models/google/gemini-2.0-flash",
+        notes="Free Gemini via OpenRouter. Good for high-volume prototyping."
+    ),
+
+    # === DIRECT PROVIDER APIs ===
 
     ModelEntry(
         provider="deepseek",

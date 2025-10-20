@@ -194,7 +194,7 @@ Review the document below and return valid JSON only."""
 
 # API configuration
 REQUIRED_ENV_VARS = ["GEMINI_API_KEY"]
-DEFAULT_MODEL = "gemini-2.0-flash"
+DEFAULT_MODEL = "gemini-2.5-flash"  # Google's recommended model for LangExtract (GA since June 2025)
 
 # ============================================================================
 # MODEL IDENTIFIERS - Premium Models for Ground Truth Creation
@@ -209,6 +209,7 @@ GPT_5_NANO = "gpt-5-nano"
 
 # Google Gemini Models
 GEMINI_2_0_FLASH = "gemini-2.0-flash"
+GEMINI_2_5_FLASH = "gemini-2.5-flash"
 GEMINI_2_5_PRO = "gemini-2.5-pro"
 
 # Anthropic Claude Models
