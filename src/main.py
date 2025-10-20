@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 """
-Whistleblower Document Processor
-Converts Colab notebook to standalone Python application
+⚠️ LEGACY STUB - NOT CURRENTLY USED ⚠️
+
+This file is a placeholder from an earlier iteration and is not part of the
+current document extraction pipeline.
+
+For actual usage, see:
+- Streamlit UI: `uv run streamlit run app.py`
+- FastAPI REST API: `uv run uvicorn src.api.main:app --reload`
+- Python API: Import from `src.core.legal_pipeline_refactored`
+- Diagnostic scripts: `scripts/*.py`
+
+See README.md for full documentation.
 """
 
 import os
@@ -82,7 +92,12 @@ def save_results(df, output_path="output/results.xlsx"):
 
 def main():
     """Main entry point"""
-    logger.info("Starting Whistleblower Document Processor")
+    logger.warning("⚠️ WARNING: This is a legacy stub file and should not be used.")
+    logger.warning("⚠️ For the current application, use:")
+    logger.warning("⚠️   - Streamlit UI: uv run streamlit run app.py")
+    logger.warning("⚠️   - FastAPI: uv run uvicorn src.api.main:app --reload")
+    logger.warning("⚠️ See README.md for full documentation.")
+    logger.info("Starting Whistleblower Document Processor (LEGACY)")
 
     # Setup environment
     if not setup_environment():
