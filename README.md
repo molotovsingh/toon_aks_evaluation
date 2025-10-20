@@ -49,12 +49,22 @@ This is a **proof-of-concept** to evaluate document parsing and AI-based legal e
    uv sync
    ```
 
-4. **Launch the test app**:
+4. **Choose your interface**:
+
+   **Complete Suite** (Flask Web UI + FastAPI Analytics):
+   ```bash
+   python run_both.py
+   ```
+   - Flask Web UI: http://localhost:5001 (upload & process documents)
+   - FastAPI Analytics: http://localhost:8000 (query stored results)
+   - FastAPI Docs: http://localhost:8000/docs
+
+   **Streamlit Web UI Only** (Legacy interface):
    ```bash
    uv run streamlit run app.py
    ```
 
-5. **Open your browser** to: `http://localhost:8501`
+5. **Open your browser** to the appropriate URL above
 
 ## 🔄 Provider Selection
 
@@ -554,6 +564,289 @@ When `ENABLE_PERFORMANCE_TIMING=false`:
 - Exports contain only the core 5 columns (no timing columns)
 - Streamlit UI shows no performance metrics section
 - Eliminates timing overhead for production use
+
+## 📊 DuckDB Analytics
+
+The system includes **DuckDB metadata ingestion** for queryable analytics across pipeline runs. Every extraction automatically exports a metadata JSON file that can be loaded into a local DuckDB database for SQL-based analysis.
+
+### Quick Start
+
+```bash
+# 1. Ingest metadata files into DuckDB
+uv run python scripts/ingest_metadata_to_duckdb.py --db runs.duckdb --glob "output/**/*_metadata.json"
+
+# 2. Run example queries
+uv run python scripts/query_duckdb.py --db runs.duckdb
+
+# 3. Or use SQL directly
+uv run python -c "
+import duckdb
+conn = duckdb.connect('runs.duckdb')
+print(conn.execute('SELECT * FROM pipeline_runs LIMIT 5').df())
+"
+```
+
+### What Gets Tracked
+
+Each pipeline run automatically exports metadata including:
+- **Configuration**: Parser, provider, model, OCR engine, table mode
+- **Performance**: Docling time, extraction time, total processing time
+- **Quality**: Events extracted, citations found, average detail length
+- **Cost**: Token usage and cost estimates (when available)
+- **Environment**: Hostname, session labels for experiment tracking
+
+**Metadata Location**: `output/{parser}-{provider}/{filename}_{timestamp}_metadata.json`
+
+### Common Queries
+
+**Average extraction time by model:**
+```sql
+SELECT provider_model,
+       AVG(extractor_seconds) as avg_time,
+       COUNT(*) as runs
+FROM pipeline_runs
+WHERE status = 'success'
+GROUP BY provider_model
+ORDER BY avg_time ASC;
+```
+
+**Cost tracking by provider:**
+```sql
+SELECT provider_name,
+       SUM(cost_usd) as total_cost,
+       COUNT(*) as runs
+FROM pipeline_runs
+WHERE cost_usd IS NOT NULL
+GROUP BY provider_name;
+```
+
+**Recent runs (last 7 days):**
+```sql
+SELECT run_id, timestamp, provider_model, events_extracted
+FROM pipeline_runs
+WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL '7 days'
+ORDER BY timestamp DESC;
+```
+
+### Available Tools
+
+- **Ingestion Script**: `scripts/ingest_metadata_to_duckdb.py` - Batch load metadata files
+- **Query Examples**: `scripts/query_duckdb.py` - Python examples for common analytics
+- **SQL Templates**: `docs/reports/duckdb-queries.sql` - 20+ copy-paste queries
+- **Schema Documentation**: `docs/reports/duckdb-ingestion-plan.md` - Complete schema design
+
+### Features
+
+- ✅ **Idempotent ingestion** - Safe to re-run (upsert logic)
+- ✅ **File-based database** - No server needed, portable
+- ✅ **JSON column support** - Full config snapshot queryable
+- ✅ **Dry-run mode** - Validate before ingesting
+- ✅ **CLI with progress** - Batch processing with stats
+
+### Example Workflow
+
+```bash
+# Process documents with different providers
+uv run streamlit run app.py  # Extract with OpenRouter
+# (Switch to Anthropic provider)
+# (Switch to OpenAI provider)
+
+# Analyze results
+uv run python scripts/ingest_metadata_to_duckdb.py --db runs.duckdb --glob "output/**/*_metadata.json"
+uv run python scripts/query_duckdb.py --db runs.duckdb --query avg-time
+uv run python scripts/query_duckdb.py --db runs.duckdb --query success-rate
+```
+
+**Use Cases:**
+- 🔍 Compare extraction quality across providers and models
+- 💰 Track API costs and optimize spending
+- ⚡ Identify performance bottlenecks
+- 📈 Monitor success rates and failure patterns
+- 🧪 Analyze A/B test results
+
+See `docs/reports/duckdb-queries.sql` for 20+ query examples.
+
+## 🚀 FastAPI Analytics API
+
+The system includes a **REST API** for querying pipeline metadata programmatically. The API provides read-only HTTP endpoints backed by DuckDB, enabling dashboard integrations, automated reporting, and programmatic analytics.
+
+### Quick Start
+
+```bash
+# 1. Set database path (required)
+export RUNS_DB_PATH=runs.duckdb
+
+# 2. Start API server
+uv run uvicorn src.api.main:app --reload --port 8000
+
+# 3. Access OpenAPI documentation
+open http://localhost:8000/docs
+```
+
+### Available Endpoints
+
+#### Health & Status
+- `GET /healthz` - Service health check (always 200 if running)
+- `GET /readyz` - Database readiness check (503 if DB unavailable)
+- `GET /version` - API version and configuration info
+
+#### Pipeline Runs
+- `GET /api/v1/runs` - List runs with filtering, sorting, and pagination
+  - **Filters**: `provider`, `model`, `status`, `date_from`, `date_to`, `filename_contains`
+  - **Sorting**: `timestamp`, `provider_name`, `provider_model`, `total_seconds`, `extractor_seconds`
+  - **Pagination**: Cursor-based (efficient for large datasets)
+- `GET /api/v1/runs/{run_id}` - Get single run details with sanitized config
+
+#### Statistics
+- `GET /api/v1/stats/by-model` - Aggregate performance by model
+- `GET /api/v1/stats/by-provider` - Aggregate performance by provider
+
+### Example Requests
+
+```bash
+# Health checks
+curl http://localhost:8000/healthz
+curl http://localhost:8000/readyz
+
+# List runs (basic)
+curl http://localhost:8000/api/v1/runs?limit=10
+
+# List runs (with filters)
+curl 'http://localhost:8000/api/v1/runs?provider=openai&status=success&sort=total_seconds:asc'
+
+# Date range filter
+curl 'http://localhost:8000/api/v1/runs?date_from=2025-10-01T00:00:00Z&date_to=2025-10-18T23:59:59Z'
+
+# Get single run
+curl http://localhost:8000/api/v1/runs/DL2-OA2-TS1-F-20251018120000
+
+# Stats by model
+curl http://localhost:8000/api/v1/stats/by-model
+
+# Stats by provider (with date filter)
+curl 'http://localhost:8000/api/v1/stats/by-provider?date_from=2025-10-17T00:00:00Z&status=success'
+```
+
+### Response Format
+
+All successful responses use a consistent envelope structure:
+
+**List Response:**
+```json
+{
+  "data": [
+    {
+      "run_id": "DL2-OA2-TS1-F-20251018120000",
+      "timestamp": "2025-10-18T12:00:00",
+      "provider_name": "openai",
+      "provider_model": "gpt-4o-mini",
+      "status": "success",
+      "total_seconds": 6.1,
+      "events_extracted": 10
+    }
+  ],
+  "meta": {
+    "returned": 10,
+    "total": 96,
+    "next_cursor": "MjAyNS0xMC0xOFQxMjowMDowMHxETDItT0EyLVRTMS1GLTIwMjUxMDE4MTIwMDAw"
+  },
+  "links": {
+    "self": "http://localhost:8000/api/v1/runs?limit=10",
+    "next": "http://localhost:8000/api/v1/runs?limit=10&cursor=..."
+  }
+}
+```
+
+**Error Response:**
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Run with id 'XYZ' not found"
+  }
+}
+```
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `RUNS_DB_PATH` | ✅ Yes | _(none)_ | Path to DuckDB file (e.g., `runs.duckdb`) |
+| `API_PORT` | No | `8000` | Server port |
+| `API_HOST` | No | `0.0.0.0` | Server host (0.0.0.0 for all interfaces) |
+| `CORS_ALLOW_ORIGINS` | No | _(empty)_ | Comma-separated allowed CORS origins |
+
+### Features
+
+- ✅ **Read-only access** - No write endpoints (safe for dashboards)
+- ✅ **Cursor pagination** - Efficient for large datasets (no OFFSET overhead)
+- ✅ **Structured errors** - Consistent error responses with codes
+- ✅ **OpenAPI documentation** - Auto-generated interactive docs at `/docs`
+- ✅ **Config sanitization** - Sensitive keys removed from API responses
+- ✅ **CORS support** - Optional CORS for browser-based dashboards
+- ✅ **SQL injection protection** - Parameterized queries + sort field whitelist
+
+### Testing
+
+Run the comprehensive test suite:
+
+```bash
+# Install test dependencies (included in uv sync)
+uv sync
+
+# Run all API tests
+uv run python -m pytest tests/test_api_fastapi.py -v
+
+# Run specific test
+uv run python -m pytest tests/test_api_fastapi.py::test_list_runs_basic -v
+```
+
+**Test Coverage:**
+- Health endpoints (healthz, readyz, version)
+- List runs (basic, filters, sorting, pagination, invalid params)
+- Get run by ID (found, not found, config sanitization)
+- Stats endpoints (by-model, by-provider, with filters)
+- OpenAPI documentation availability
+- Error handling (400, 404, 500)
+
+### OpenAPI Documentation
+
+Interactive API documentation is available at:
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
+- **OpenAPI Spec**: `http://localhost:8000/openapi.json`
+
+### Production Deployment
+
+For production use, configure a production-grade ASGI server:
+
+```bash
+# With Gunicorn + Uvicorn workers (Linux/macOS)
+pip install gunicorn
+gunicorn src.api.main:app \
+  --workers 4 \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --bind 0.0.0.0:8000
+
+# Or use systemd service (see deployment docs)
+```
+
+### Security Notes
+
+- **No authentication** - Implement reverse proxy auth if exposing publicly
+- **Read-only database** - API uses `read_only=True` DuckDB connections
+- **Config sanitization** - API keys, tokens, and secrets removed from responses
+- **CORS allowlist** - Only specified origins allowed (default: none)
+
+### Use Cases
+
+🔍 **Dashboard Integration** - Connect Grafana, Metabase, or custom dashboards
+📊 **Automated Reporting** - Generate daily/weekly performance reports via API
+🔄 **CI/CD Integration** - Query extraction metrics as part of build pipelines
+📈 **Real-time Monitoring** - Poll `/api/v1/stats` for live performance metrics
+🧪 **A/B Test Analysis** - Compare provider performance programmatically
+
+See `tests/test_api_fastapi.py` for example API usage patterns.
 
 ## 🤖 Assistant Guardrails
 
