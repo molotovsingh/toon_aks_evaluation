@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.115.0",
 "flask>=3.0.0",
 "flask-session>=0.8.0",
+"flask-wtf>=1.2.0",
 "werkzeug>=3.0.0",
     "google-generativeai>=0.8.0",
     "langextract",

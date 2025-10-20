@@ -2,9 +2,11 @@
 """Flask Web UI for Legal Events Extraction - Production Ready"""
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
-import os, logging, uuid, tempfile
+import os, logging, uuid, tempfile, atexit, shutil
 from dotenv import load_dotenv
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import RequestEntityTooLarge
 from datetime import datetime
 from pathlib import Path
 from io import StringIO
@@ -16,13 +18,16 @@ from src.core.legal_pipeline_refactored import LegalEventsPipeline
 from src.utils.file_handler import FileHandler
 from src.core.constants import FIVE_COLUMN_HEADERS
 from src.core.model_catalog import get_ui_model_config_list
-from src.ui.classification_ui import create_classification_config
+from src.core.results_store import get_results_store
+from src.core.classification_catalog import get_classification_catalog
+from src.core.prompt_registry import get_prompt_variant
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
 # Security: Use proper secret key
 secret_key = os.getenv('FLASK_SECRET_KEY')
 if not secret_key:
@@ -33,29 +38,69 @@ if not secret_key:
     else:
         raise ValueError("FLASK_SECRET_KEY environment variable is required for production")
 app.secret_key = secret_key
-app.config['UPLOAD_FOLDER'] = tempfile.mkdtemp()
+
+# Create temp upload folder with cleanup on exit
+upload_folder = tempfile.mkdtemp()
+app.config['UPLOAD_FOLDER'] = upload_folder
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB limit
 app.config['SESSION_PERMANENT'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
 
+# Register cleanup function to remove temp directory on exit
+def cleanup_temp_upload_folder():
+    """Clean up temporary upload folder on app shutdown"""
+    if os.path.exists(upload_folder):
+        try:
+            shutil.rmtree(upload_folder, ignore_errors=True)
+            logger.info(f"🧹 Cleaned up temp upload folder: {upload_folder}")
+        except Exception as e:
+            logger.warning(f"Failed to clean up temp folder: {e}")
+
+atexit.register(cleanup_temp_upload_folder)
+
+# CSRF Protection (Cross-Site Request Forgery)
+csrf = CSRFProtect(app)
+logger.info("✅ CSRF protection enabled")
+
+# NOTE: Templates must include CSRF token in forms
+# Add to templates: <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+# OR for AJAX: Include X-CSRFToken header from meta tag
+
+# Session security
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# Only set Secure in production (when not debug)
+if not app.debug:
+    app.config['SESSION_COOKIE_SECURE'] = True
+
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt', 'msg', 'eml', 'jpg', 'jpeg', 'png'}
 
 class FlaskUploadedFile:
-    """Flask equivalent of Streamlit UploadedFile"""
+    """Flask equivalent of Streamlit UploadedFile with proper resource management"""
     def __init__(self, file_path: str):
         self.file_path = file_path
         self.name = os.path.basename(file_path)
         self._file_obj = None
 
     def getbuffer(self):
-        if self._file_obj is None:
-            self._file_obj = open(self.file_path, 'rb')
-        self._file_obj.seek(0)
-        return self._file_obj.read()
+        """Read file contents into buffer with proper resource cleanup"""
+        with open(self.file_path, 'rb') as f:
+            return f.read()
 
-    def read(self): return self.getbuffer()
-    def seek(self, position): self._file_obj and self._file_obj.seek(position)
-    def close(self): self._file_obj and self._file_obj.close(); self._file_obj = None
+    def read(self):
+        """Read file contents (calls getbuffer for compatibility)"""
+        return self.getbuffer()
+
+    def seek(self, position):
+        """Seek to position (no-op for buffer-based reading)"""
+        if self._file_obj:
+            self._file_obj.seek(position)
+
+    def close(self):
+        """Close file handle if open"""
+        if self._file_obj:
+            self._file_obj.close()
+            self._file_obj = None
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -95,6 +140,18 @@ def upload():
     model = request.form.get('model', '')
     enable_classification = request.form.get('enable_classification') == 'on'
 
+    # Validate provider and extractor
+    VALID_PROVIDERS = {'openrouter', 'anthropic', 'openai', 'langextract', 'deepseek', 'opencode_zen'}
+    VALID_EXTRACTORS = {'docling', 'qwen_vl'}
+
+    if provider not in VALID_PROVIDERS:
+        flash(f'Invalid provider: {provider}. Allowed: {", ".join(VALID_PROVIDERS)}')
+        return redirect(url_for('index'))
+
+    if extractor not in VALID_EXTRACTORS:
+        flash(f'Invalid extractor: {extractor}. Allowed: {", ".join(VALID_EXTRACTORS)}')
+        return redirect(url_for('index'))
+
     # LangExtract doesn't need model
     if provider == 'langextract':
         model = None
@@ -128,7 +185,9 @@ def upload():
         return redirect(url_for('index'))
 
     file_objects = []
-    run_id = str(uuid.uuid4())[:8].upper()
+    # Generate secure 16-character run ID (16^16 = 1.8 × 10^19 combinations)
+    # Previous: 8 chars (16^8 = 4 billion) - vulnerable to brute force
+    run_id = str(uuid.uuid4()).replace('-', '')[:16].upper()
 
     session['current_run_id'] = run_id
     session.pop('results', None)
@@ -151,6 +210,7 @@ def upload():
         # === CLASSIFICATION LAYER (Layer 1.5) - Optional ===
         classification_lookup = {}  # {filename: document_type}
         classifications = []  # For display
+        classification_model = None  # Initialize to prevent NameError
 
         if enable_classification:
             logger.info("🏷️ Classification layer enabled - classifying documents")
@@ -160,10 +220,23 @@ def upload():
                 # Import classification factory
                 from src.core.classification_factory import create_classifier
 
-                # Create classifier (uses OpenRouter by default)
-                classification_model, classification_prompt = create_classification_config()
-                if classification_model:
+                # Get recommended classification model (non-UI path)
+                catalog = get_classification_catalog()
+                recommended_models = catalog.list_models(enabled=True, recommended_only=True)
+
+                if recommended_models:
+                    classification_model_entry = recommended_models[0]
+                    classification_model = classification_model_entry.model_id
+                    classification_prompt = classification_model_entry.recommended_prompt
+
+                    logger.info(f"Using classification model: {classification_model} with prompt: {classification_prompt}")
                     classifier = create_classifier(classification_model, classification_prompt)
+                else:
+                    logger.warning("No recommended classification models available")
+                    classification_model = None
+                    classifier = None
+
+                if classifier:
 
                     # Extract and classify all documents
                     with tempfile.TemporaryDirectory() as temp_dir:
@@ -226,9 +299,8 @@ def upload():
 
         # === ADD CLASSIFICATION AS 6TH COLUMN (if enabled) ===
         if enable_classification and classification_lookup:
-            from src.core.constants import FIVE_COLUMN_HEADERS
-
             # Add Document Type column by mapping Document Reference to classification
+            # (FIVE_COLUMN_HEADERS already imported at top)
             legal_events_df['Document Type'] = legal_events_df[FIVE_COLUMN_HEADERS[4]].map(
                 classification_lookup
             )
@@ -242,37 +314,53 @@ def upload():
             # Store results with run ID and metadata
             processing_metadata = {
                 'run_id': run_id,
-                'timestamp': datetime.now().isoformat(),
+                'timestamp': datetime.now(),
                 'provider': provider,
                 'model': model,
                 'extractor': extractor,
                 'file_count': len(valid_files),
-                'events_found': len(legal_events_df)
+                'events_found': len(legal_events_df),
+                'enable_classification': enable_classification,
+                'classification_model': classification_model if enable_classification else None,
+                'document_types_found': len(set(classification_lookup.values())) if classification_lookup else 0,
+                'filename': Path(valid_files[0]).name if valid_files else 'unknown',
+                'file_size': sum(Path(f.file_path).stat().st_size for f in file_objects) if file_objects else 0,
+                'processing_time': None
             }
 
-            # Store results in session with enhanced metadata
-            enhanced_metadata = processing_metadata.copy()
-            enhanced_metadata.update({
-                'enable_classification': enable_classification,
-                'classification_model': 'openrouter' if enable_classification else None,
-                'document_types_found': len(set(classification_lookup.values())) if classification_lookup else 0,
-                'filename': getattr(valid_files[0], 'name', 'unknown') if valid_files else 'unknown',
-                'file_size': sum(getattr(f, 'getbuffer', lambda: b'').__call__().__len__() for f in file_objects) if file_objects else 0,
-                'processing_time': None
-            })
+            # Get session info for tracking
+            # Generate or retrieve session ID from cookie
+            session_cookie_name = app.config.get('SESSION_COOKIE_NAME', 'session')
+            session_id = request.cookies.get(session_cookie_name, f'flask-{run_id}')
 
-            # Store results in session
-            session['results'] = legal_events_df.to_json(orient='records')
-            session['results_columns'] = list(legal_events_df.columns)
-            session['processing_metadata'] = enhanced_metadata
-            session['current_run_id'] = run_id
+            session_info = {
+                'session_id': session_id,
+                'user_agent': request.headers.get('User-Agent', ''),
+                'ip_address': request.remote_addr or ''
+            }
 
-            logger.info(f"✅ Processing complete - Run ID: {run_id}, Events: {len(legal_events_df)}")
-            logger.info(f"   Results stored in session for run ID: {run_id}")
+            # Store results in DuckDB
+            results_store = get_results_store()
+            success = results_store.store_processing_result(
+                run_id=run_id,
+                metadata=processing_metadata,
+                results_df=legal_events_df,
+                session_info=session_info
+            )
 
-            # Auto-redirect to results page with run ID in URL
-            logger.info("🔄 Redirecting to results page...")
-            return redirect(url_for('results', run_id=run_id))
+            if success:
+                # Store only run_id in session (not the large results)
+                session['current_run_id'] = run_id
+
+                logger.info(f"✅ Processing complete - Run ID: {run_id}, Events: {len(legal_events_df)}")
+                logger.info(f"   Results stored in DuckDB for run ID: {run_id}")
+
+                # Auto-redirect to results page with run ID in URL
+                logger.info("🔄 Redirecting to results page...")
+                return redirect(url_for('results', run_id=run_id))
+            else:
+                flash('Failed to store results')
+                return redirect(url_for('index'))
         else:
             flash('Processing failed')
             return redirect(url_for('index'))
@@ -314,35 +402,35 @@ def results():
     # Store run_id in session for future requests (downloads, etc.)
     session['current_run_id'] = run_id
 
-    # Retrieve results from session
-    results_json = session.get('results')
-    if not results_json:
-        logger.warning("❌ No results in session")
+    # Retrieve results from DuckDB
+    results_store = get_results_store()
+    result_data = results_store.get_processing_result(run_id)
+
+    if not result_data:
+        logger.warning(f"❌ No results found in database for run_id: {run_id}")
         flash('No results available - please upload files first')
         return redirect(url_for('index'))
 
-    # Deserialize results
-    results_columns = session.get('results_columns', [])
-    metadata = session.get('processing_metadata', {})
+    # Extract metadata and events
+    metadata = result_data['metadata']
+    events = result_data['events']
 
-    try:
-        results_df = pd.read_json(StringIO(results_json), orient='records')
-        results = results_df.to_dict('records')
-        columns = results_columns or list(results_df.columns)
-        logger.info(f"✅ DataFrame deserialized - {len(results)} rows")
-    except Exception as e:
-        logger.error(f"❌ Failed to deserialize results: {e}")
-        results = []
-        columns = []
+    # Convert events to the format expected by template
+    results = []
+    columns = []
+    if events:
+        # Get column names from first event
+        columns = list(events[0].keys())
+        results = events
 
-    logger.info(f"✅ Results retrieved from session - Run ID: {run_id}, Events: {len(results)}")
+    logger.info(f"✅ Results retrieved from DuckDB - Run ID: {run_id}, Events: {len(results)}")
 
     return render_template('results.html',
-                         results=results,
-                         columns=columns,
-                         count=len(results),
-                         run_id=run_id,
-                         metadata=metadata)
+                          results=results,
+                          columns=columns,
+                          count=len(results),
+                          run_id=run_id,
+                          metadata=metadata)
 
 @app.route('/api/cost-estimate', methods=['POST'])
 def cost_estimate():
@@ -420,22 +508,86 @@ def get_models_for_provider(provider):
 @app.route('/download/<run_id>')
 def download_results(run_id):
     """Download results for a specific run ID"""
-    # Check if this run ID matches the current session
+    # ===================================================================
+    # TODO SECURITY: Implement Database-Backed Ownership Authorization
+    # ===================================================================
+    # Current implementation: Weak (session-only validation)
+    #   - Only checks if run_id matches session['current_run_id']
+    #   - Session can be manipulated/stolen
+    #   - No persistent ownership tracking
+    #
+    # Required Enhancements:
+    #
+    # 1. DATABASE SCHEMA CHANGES (src/core/results_store.py):
+    #    - Add ownership tracking columns to pipeline_runs table
+    #    - Store session_id, user_ip, user_agent on every upload
+    #    - Add created_at, expires_at for automatic cleanup
+    #
+    #    ALTER TABLE pipeline_runs ADD COLUMN IF NOT EXISTS:
+    #      - session_owner TEXT NOT NULL  (from request.cookies['session'])
+    #      - ip_owner TEXT                (from request.remote_addr)
+    #      - user_agent TEXT             (from request.headers['User-Agent'])
+    #      - created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    #      - expires_at TIMESTAMP        (created_at + 24 hours)
+    #
+    #    CREATE INDEX idx_session_owner ON pipeline_runs(session_owner);
+    #    CREATE INDEX idx_expires_at ON pipeline_runs(expires_at);
+    #
+    # 2. STORAGE CHANGES (flask_app.py:291-300):
+    #    Update store_processing_result() call to include:
+    #      session_info = {
+    #          'session_id': request.cookies.get('session'),
+    #          'user_ip': request.remote_addr,
+    #          'user_agent': request.headers.get('User-Agent'),
+    #      }
+    #
+    # 3. RETRIEVAL CHANGES (this function):
+    #    Replace session-only check with database ownership verification:
+    #
+    #    result = results_store.get_processing_result_with_ownership(run_id)
+    #    if not result:
+    #        abort(404)  # Not found
+    #
+    #    current_session = request.cookies.get('session')
+    #    if result['session_owner'] != current_session:
+    #        logger.warning(f"Unauthorized download attempt: {run_id} by {current_session}")
+    #        abort(403)  # Forbidden - not your data
+    #
+    # 4. CLEANUP JOB (new route: /admin/cleanup-expired):
+    #    Periodically delete expired results:
+    #      DELETE FROM pipeline_runs WHERE expires_at < CURRENT_TIMESTAMP;
+    #
+    # 5. RATE LIMITING (optional - requires flask-limiter):
+    #    @limiter.limit("10 per minute")
+    #    def download_results(run_id):
+    #        ...
+    #
+    # Security Impact:
+    #   - Current: Run ID brute force = 16^16 attempts (now improved from 16^8)
+    #   - Enhanced: Run ID + session match required (adds 2^256 session entropy)
+    #   - Result: Effectively impossible to access other users' data
+    # ===================================================================
+
+    # Current (weak) implementation - session-only check
     current_run_id = session.get('current_run_id')
     if current_run_id != run_id:
         flash('Invalid or expired run ID')
         return redirect(url_for('index'))
 
-    # Get results from session
-    results_json = session.get('results')
-    if not results_json:
+    # Get results from DuckDB
+    results_store = get_results_store()
+    result_data = results_store.get_processing_result(run_id)
+
+    if not result_data or not result_data['events']:
         flash('No results available for download')
         return redirect(url_for('index'))
 
     try:
-        results_df = pd.read_json(StringIO(results_json), orient='records')
+        # Convert events to DataFrame
+        events = result_data['events']
+        results_df = pd.DataFrame(events)
 
-        # Create CSV response
+    # Create CSV response
         csv_buffer = StringIO()
         results_df.to_csv(csv_buffer, index=False)
         csv_data = csv_buffer.getvalue()
@@ -561,6 +713,15 @@ def test_session():
             'timestamp': session.get('test_timestamp', 'not_found'),
             'session_keys': list(session.keys())
         })
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_file_too_large(e):
+    """Handle file uploads that exceed MAX_CONTENT_LENGTH"""
+    return jsonify({
+        'error': 'File too large',
+        'message': 'The uploaded file exceeds the maximum allowed size of 50MB.',
+        'max_size': '50MB'
+    }), 413
 
 if __name__ == '__main__':
     print("🚀 Starting Flask Legal Events Extraction UI")
