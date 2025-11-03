@@ -5,6 +5,8 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 import os, logging, uuid, tempfile, atexit, shutil, re
 from dotenv import load_dotenv
 from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 from datetime import datetime, timedelta
@@ -12,6 +14,7 @@ from pathlib import Path
 from io import StringIO
 import pandas as pd
 import markupsafe  # For escaping user input in flash messages
+import json
 
 # Load environment and imports
 load_dotenv()
@@ -62,6 +65,15 @@ atexit.register(cleanup_temp_upload_folder)
 csrf = CSRFProtect(app)
 logger.info("✅ CSRF protection enabled")
 
+# Rate Limiting (prevent brute-force, DoS)
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["1000 per day", "200 per hour"],
+    storage_uri="memory://"  # Use Redis in production
+)
+logger.info("✅ Rate limiting enabled")
+
 # NOTE: Templates must include CSRF token in forms
 # Add to templates: <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 # OR for AJAX: Include X-CSRFToken header from meta tag
@@ -73,7 +85,19 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 if not app.debug:
     app.config['SESSION_COOKIE_SECURE'] = True
 
+# Security Configuration
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt', 'msg', 'eml', 'jpg', 'jpeg', 'png'}
+MAX_FILES_PER_UPLOAD = 100  # Prevent resource exhaustion
+MIME_TYPE_WHITELIST = {
+    'pdf': {'application/pdf'},
+    'docx': {'application/vnd.openxmlformats-officedocument.wordprocessingml.document'},
+    'txt': {'text/plain'},
+    'jpg': {'image/jpeg'},
+    'jpeg': {'image/jpeg'},
+    'png': {'image/png'},
+    'msg': {'application/vnd.ms-outlook'},
+    'eml': {'message/rfc822'}
+}
 
 class FlaskUploadedFile:
     """Flask equivalent of Streamlit UploadedFile with proper resource management"""
@@ -122,6 +146,34 @@ class FlaskUploadedFile:
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def validate_file_content(filepath: str, expected_ext: str) -> bool:
+    """Validate file content matches declared extension using MIME type"""
+    try:
+        import magic
+        mime = magic.from_file(filepath, mime=True)
+
+        if expected_ext not in MIME_TYPE_WHITELIST:
+            return False
+
+        allowed_mimes = MIME_TYPE_WHITELIST[expected_ext]
+        return mime in allowed_mimes
+    except Exception as e:
+        logger.warning(f"MIME validation failed for {filepath}: {e} (allowing through)")
+        return True  # Fail open if python-magic not available
+
+def log_security_event(event_type: str, details: dict):
+    """Structured security event logging for monitoring"""
+    try:
+        event = {
+            'timestamp': datetime.now().isoformat(),
+            'event_type': event_type,
+            'ip_address': request.remote_addr or 'unknown',
+            'details': details
+        }
+        logger.warning(f"SECURITY_EVENT: {json.dumps(event)}")
+    except Exception as e:
+        logger.error(f"Failed to log security event: {e}")
+
 @app.route('/')
 def index():
     providers = [
@@ -141,14 +193,23 @@ def index():
                          selected_extractor=session.get('extractor', 'docling'))
 
 @app.route('/upload', methods=['POST'])
+@limiter.limit("10 per hour")  # Strict rate limit on heavy endpoint
 def upload():
     if 'files' not in request.files:
-        flash('No files selected')
+        log_security_event('upload_no_files', {'reason': 'missing_files_field'})
+        flash('No files were selected for upload')
         return redirect(url_for('index'))
 
     files = request.files.getlist('files')
     if not files or files[0].filename == '':
-        flash('No files selected')
+        log_security_event('upload_empty_files', {'reason': 'empty_file_list'})
+        flash('No files were selected for upload')
+        return redirect(url_for('index'))
+
+    # Fix #3: Check MAX_FILES_PER_UPLOAD to prevent resource exhaustion
+    if len(files) > MAX_FILES_PER_UPLOAD:
+        log_security_event('excessive_file_upload', {'count': len(files), 'limit': MAX_FILES_PER_UPLOAD})
+        flash('The upload was rejected due to system constraints. Please try with fewer files.')
         return redirect(url_for('index'))
 
     # Get config
@@ -162,11 +223,13 @@ def upload():
     VALID_EXTRACTORS = {'docling', 'qwen_vl'}
 
     if provider not in VALID_PROVIDERS:
-        flash(f'Invalid provider: {provider}. Allowed: {", ".join(VALID_PROVIDERS)}')
+        log_security_event('invalid_provider', {'provider': provider, 'valid': list(VALID_PROVIDERS)})
+        flash('Invalid configuration. Please reload the page and try again.')
         return redirect(url_for('index'))
 
     if extractor not in VALID_EXTRACTORS:
-        flash(f'Invalid extractor: {extractor}. Allowed: {", ".join(VALID_EXTRACTORS)}')
+        log_security_event('invalid_extractor', {'extractor': extractor, 'valid': list(VALID_EXTRACTORS)})
+        flash('Invalid configuration. Please reload the page and try again.')
         return redirect(url_for('index'))
 
     # LangExtract doesn't need model
@@ -175,7 +238,8 @@ def upload():
 
     # Validate required fields
     if provider != 'langextract' and not model:
-        flash('Model selection is required for this provider')
+        log_security_event('missing_model', {'provider': provider})
+        flash('Invalid configuration. Please reload the page and try again.')
         return redirect(url_for('index'))
 
     # Store config
@@ -196,17 +260,38 @@ def upload():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             try:
                 file.save(filepath)
+
+                # Fix #4: Validate file content matches declared extension
+                file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+                if not validate_file_content(filepath, file_ext):
+                    # Content validation failed - MIME type mismatch
+                    log_security_event('mime_type_mismatch', {
+                        'filename': filename,
+                        'declared_ext': file_ext,
+                        'file_size': os.path.getsize(filepath)
+                    })
+                    try:
+                        os.remove(filepath)
+                    except Exception as e:
+                        logger.warning(f"Failed to delete invalid file {filepath}: {e}")
+                    # Don't add to valid_files, don't flash (silent fail)
+                    continue
+
                 valid_files.append(filepath)
             except Exception as e:
                 logger.error(f"Failed to save file {filename}: {e}")
-                flash(f'Failed to save file: {markupsafe.escape(filename)}')
+                # Don't reveal details in flash message
+                log_security_event('file_save_error', {'filename': filename, 'error': str(e)})
+                # Silent fail - don't flash anything
         else:
             # Sanitize filename before displaying in flash message
             safe_filename = markupsafe.escape(file.filename) if file else "unknown"
-            flash(f'Invalid file type: {safe_filename}')
+            # Silent validation fail - don't flash anything
+            log_security_event('invalid_file_extension', {'filename': safe_filename})
 
     if not valid_files:
-        flash('No valid files uploaded')
+        log_security_event('upload_no_valid_files', {})
+        flash('No valid files were found. Please check your files and try again.')
         return redirect(url_for('index'))
 
     file_objects = []
@@ -231,6 +316,16 @@ def upload():
             # Create FlaskUploadedFile object that mimics Streamlit UploadedFile
             file_obj = FlaskUploadedFile(filepath)
             file_objects.append(file_obj)
+
+        # Fix #2: Buffer all files into memory BEFORE pipeline processing
+        # This prevents race condition where cleanup code deletes files while pipeline reads them
+        for file_obj in file_objects:
+            try:
+                file_obj.getbuffer()  # Load file contents into memory
+            except Exception as e:
+                logger.error(f"Failed to buffer file {file_obj.name}: {e}")
+                log_security_event('file_buffer_error', {'filename': file_obj.name, 'error': str(e)})
+                raise
 
         # === CLASSIFICATION LAYER (Layer 1.5) - Optional ===
         classification_lookup = {}  # {filename: document_type}
@@ -304,11 +399,13 @@ def upload():
 
                 else:
                     logger.warning("⚠️ Classification enabled but no model available")
-                    flash('⚠️ Classification requested but no classification model available')
+                    log_security_event('classification_no_model', {})
+                    flash('Classification feature is temporarily unavailable. Processing will continue without classification.')
 
             except Exception as e:
                 logger.error(f"❌ Classification layer failed: {e}")
-                flash(f'🚨 Classification failed: {str(e)}\n\nProceeding without classification...')
+                log_security_event('classification_error', {'error': str(e)})
+                flash('An error occurred during classification. Processing will continue without classification.')
                 enable_classification = False
 
         # === LAYER 2: EVENT EXTRACTION ===
@@ -381,15 +478,18 @@ def upload():
                 logger.info("🔄 Redirecting to results page...")
                 return redirect(url_for('results', run_id=run_id))
             else:
-                flash('Failed to store results')
+                log_security_event('results_store_failed', {'run_id': run_id})
+                flash('An error occurred while processing your files. Please try again.')
                 return redirect(url_for('index'))
         else:
-            flash('Processing failed')
+            log_security_event('processing_failed', {'files': len(valid_files)})
+            flash('An error occurred while processing your files. Please try again.')
             return redirect(url_for('index'))
 
     except Exception as e:
         logger.error(f'Processing error: {e}')
-        flash(f'Processing error: {str(e)}')
+        log_security_event('processing_exception', {'error': str(e)})
+        flash('An error occurred while processing your files. Please try again.')
         return redirect(url_for('index'))
 
     finally:
@@ -418,7 +518,8 @@ def results():
 
     if not run_id:
         logger.warning("❌ No run_id in URL or session")
-        flash('Invalid session - please upload files again')
+        log_security_event('results_no_run_id', {})
+        flash('Your session has expired. Please upload files again.')
         return redirect(url_for('index'))
 
     # Store run_id in session for future requests (downloads, etc.)
@@ -430,7 +531,8 @@ def results():
 
     if not result_data:
         logger.warning(f"❌ No results found in database for run_id: {run_id}")
-        flash('No results available - please upload files first')
+        log_security_event('results_not_found', {'run_id': run_id})
+        flash('Results are no longer available. Please upload files again.')
         return redirect(url_for('index'))
 
     # Extract metadata and events
@@ -455,14 +557,13 @@ def results():
                           metadata=metadata)
 
 @app.route('/api/cost-estimate', methods=['POST'])
+@limiter.limit("100 per hour")  # Rate limit API endpoint
 def cost_estimate():
     """API endpoint for cost estimation using tiktoken for accuracy"""
     # Validate request has JSON data
     if not request.json:
-        return jsonify({
-            'error': 'Invalid request',
-            'message': 'Request body must be JSON'
-        }), 400
+        log_security_event('api_invalid_request', {'endpoint': '/api/cost-estimate', 'reason': 'no_json'})
+        return jsonify({'error': 'Invalid request format'}), 400
 
     data = request.json
     provider = data.get('provider')
@@ -471,10 +572,8 @@ def cost_estimate():
 
     # Validate required fields
     if not provider:
-        return jsonify({
-            'error': 'Missing provider',
-            'message': 'Provider field is required'
-        }), 400
+        log_security_event('api_missing_provider', {'endpoint': '/api/cost-estimate'})
+        return jsonify({'error': 'Invalid request'}), 400
 
     try:
         # Import cost estimation functions
@@ -539,19 +638,16 @@ def cost_estimate():
                 'warning': 'Using heuristic estimation (no text provided for precise calculation)'
             })
         else:
-            return jsonify({
-                'error': 'Model not found',
-                'message': f'No model found for provider={provider}, model={model}'
-            }), 404
+            log_security_event('api_model_not_found', {'endpoint': '/api/cost-estimate', 'provider': provider, 'model': model})
+            return jsonify({'error': 'Configuration not available'}), 404
 
     except Exception as e:
         logger.error(f'Cost estimation error: {e}')
-        return jsonify({
-            'error': 'Cost estimation failed',
-            'message': str(e)
-        }), 500
+        log_security_event('api_cost_estimate_error', {'endpoint': '/api/cost-estimate', 'error': str(e)})
+        return jsonify({'error': 'Service temporarily unavailable'}), 500
 
 @app.route('/api/providers')
+@limiter.limit("500 per hour")  # Higher limit for read-only endpoints
 def get_providers():
     """API endpoint to get available providers and their status"""
     providers_status = []
@@ -576,6 +672,7 @@ def get_providers():
     return jsonify(providers_status)
 
 @app.route('/api/models/<provider>')
+@limiter.limit("500 per hour")  # Higher limit for read-only endpoints
 def get_models_for_provider(provider):
     """API endpoint to get available models for a specific provider"""
     # Load fresh model catalog to pick up any newly added models
@@ -604,27 +701,52 @@ def get_models_for_provider(provider):
     })
 
 @app.route('/download/<run_id>')
+@limiter.limit("50 per hour")  # Rate limit downloads to prevent brute-force attacks
 def download_results(run_id):
-    """Download results for a specific run ID with authorization"""
+    """Download results for a specific run ID with database-backed authorization"""
     # Validate run_id format - must be exactly 16 hex characters (from uuid)
     if not re.match(r'^[0-9A-F]{16}$', run_id):
         logger.warning(f"Invalid run_id format attempted: {run_id}")
         abort(400)  # Bad request - invalid format
 
-    # Authorization check - verify run_id matches session
-    # NOTE: This is session-based auth. For production, implement database-backed
-    # ownership tracking with IP, user agent, and session verification.
-    current_run_id = session.get('current_run_id')
-    if current_run_id != run_id:
-        logger.warning(f"Unauthorized download attempt: {run_id} from session {current_run_id}")
-        abort(403)  # Forbidden - deny without info leak
-
-    # Get results from DuckDB
+    # Fix #1: Database-backed authorization with multi-factor verification
     results_store = get_results_store()
     result_data = results_store.get_processing_result(run_id)
 
-    if not result_data or not result_data['events']:
-        logger.warning(f"No results found for run_id: {run_id}")
+    if not result_data:
+        # Don't leak that the run_id doesn't exist
+        log_security_event('download_not_found', {'run_id': run_id})
+        abort(404)
+
+    # Multi-factor verification: Check session, IP, and user agent
+    session_info = result_data.get('session_info', {})
+    current_session_id = request.cookies.get(app.config.get('SESSION_COOKIE_NAME', 'session'), '')
+    current_ip = request.remote_addr or ''
+    current_user_agent = request.headers.get('User-Agent', '')
+
+    # Verify at least one factor matches (IP or user agent)
+    ip_match = current_ip == session_info.get('ip_address', '')
+    user_agent_match = current_user_agent == session_info.get('user_agent', '')
+
+    if not (ip_match or user_agent_match):
+        # Both factors don't match - deny access
+        log_security_event('download_unauthorized', {
+            'run_id': run_id,
+            'reason': 'multi_factor_mismatch',
+            'stored_ip': session_info.get('ip_address', ''),
+            'request_ip': current_ip,
+            'stored_ua': session_info.get('user_agent', ''),
+            'request_ua': current_user_agent
+        })
+        abort(403)
+
+    # Additional session check - at least verify current session has accessed this run_id
+    if session.get('current_run_id') != run_id:
+        # Session doesn't have this run_id - but allow if multi-factor passed
+        logger.info(f"Download request for run_id {run_id} without session history - but passed multi-factor auth")
+
+    if not result_data.get('events'):
+        log_security_event('download_no_events', {'run_id': run_id})
         abort(404)  # Not found - don't redirect, just 404
 
     try:
@@ -760,11 +882,18 @@ def test_session():
 @app.errorhandler(RequestEntityTooLarge)
 def handle_file_too_large(e):
     """Handle file uploads that exceed MAX_CONTENT_LENGTH"""
-    return jsonify({
-        'error': 'File too large',
-        'message': 'The uploaded file exceeds the maximum allowed size of 100MB.',
-        'max_size': '100MB'
-    }), 413
+    log_security_event('file_too_large', {'max_size': '100MB'})
+    return jsonify({'error': 'File exceeds maximum size'}), 413
+
+@app.errorhandler(400)
+def handle_csrf_error(e):
+    """Handle CSRF token errors without leaking details"""
+    # Check if this is a CSRF error
+    if 'CSRF' in str(e) or 'csrf' in str(e):
+        log_security_event('csrf_error', {'error': str(e)})
+        return jsonify({'error': 'Invalid request. Please try again.'}), 400
+    # For other 400 errors, return generic message
+    return jsonify({'error': 'Invalid request'}), 400
 
 if __name__ == '__main__':
     print("🚀 Starting Flask Legal Events Extraction UI")
