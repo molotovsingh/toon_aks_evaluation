@@ -264,44 +264,41 @@ def upload():
                 if classifier:
 
                     # Extract and classify all documents
-                    with tempfile.TemporaryDirectory() as temp_dir:
-                        temp_path = Path(temp_dir)
+                    for file_obj in file_objects:
+                        try:
+                            # Extract directly from the uploaded file path
+                            # FlaskUploadedFile has a file_path attribute pointing to the uploaded file
+                            doc_result = pipeline.document_extractor.extract(file_obj.file_path)
 
-                        for file_obj in file_objects:
-                            try:
-                                # Save and extract (uses cache)
-                                file_path = file_handler.save_uploaded_file(file_obj, temp_path)
-                                doc_result = pipeline.document_extractor.extract(file_path)
+                            if not doc_result or not doc_result.plain_text.strip():
+                                logger.warning(f"⚠️ No text extracted from {file_obj.name} - skipping classification")
+                                classification_lookup[file_obj.name] = "Unknown"
+                                continue
 
-                                if not doc_result or not doc_result.plain_text.strip():
-                                    logger.warning(f"⚠️ No text extracted from {file_obj.name} - skipping classification")
-                                    classification_lookup[file_obj.name] = "Unknown"
-                                    continue
+                            # Classify document
+                            classification_result = classifier.classify(
+                                doc_result.plain_text,
+                                document_title=file_obj.name
+                            )
 
-                                # Classify document
-                                classification_result = classifier.classify(
-                                    doc_result.plain_text,
-                                    document_title=file_obj.name
-                                )
+                            # Store for 6th column
+                            classification_lookup[file_obj.name] = classification_result['primary']
 
-                                # Store for 6th column
-                                classification_lookup[file_obj.name] = classification_result['primary']
+                            classifications.append({
+                                'filename': file_obj.name,
+                                'type': classification_result['primary'],
+                                'confidence': classification_result.get('confidence', 0.0),
+                                'all_labels': classification_result.get('classes', [])
+                            })
 
-                                classifications.append({
-                                    'filename': file_obj.name,
-                                    'type': classification_result['primary'],
-                                    'confidence': classification_result.get('confidence', 0.0),
-                                    'all_labels': classification_result.get('classes', [])
-                                })
+                            logger.info(
+                                f"✅ Classified {file_obj.name}: {classification_result['primary']} "
+                                f"(confidence={classification_result.get('confidence', 0):.2f})"
+                            )
 
-                                logger.info(
-                                    f"✅ Classified {file_obj.name}: {classification_result['primary']} "
-                                    f"(confidence={classification_result.get('confidence', 0):.2f})"
-                                )
-
-                            except Exception as e:
-                                logger.error(f"❌ Classification failed for {file_obj.name}: {e}")
-                                classification_lookup[file_obj.name] = "Classification Failed"
+                        except Exception as e:
+                            logger.error(f"❌ Classification failed for {file_obj.name}: {e}")
+                            classification_lookup[file_obj.name] = "Classification Failed"
 
                     # Classification results will be stored with metadata
 
