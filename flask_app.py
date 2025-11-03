@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """Flask Web UI for Legal Events Extraction - Production Ready"""
 
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
-import os, logging, uuid, tempfile, atexit, shutil
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, abort
+import os, logging, uuid, tempfile, atexit, shutil, re
 from dotenv import load_dotenv
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from io import StringIO
 import pandas as pd
+import markupsafe  # For escaping user input in flash messages
 
 # Load environment and imports
 load_dotenv()
 from src.core.legal_pipeline_refactored import LegalEventsPipeline
-from src.utils.file_handler import FileHandler
 from src.core.constants import FIVE_COLUMN_HEADERS
 from src.core.model_catalog import get_ui_model_config_list
 from src.core.results_store import get_results_store
@@ -44,7 +44,7 @@ upload_folder = tempfile.mkdtemp()
 app.config['UPLOAD_FOLDER'] = upload_folder
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB limit
 app.config['SESSION_PERMANENT'] = True
-app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)  # Use timedelta, not int
 
 # Register cleanup function to remove temp directory on exit
 def cleanup_temp_upload_folder():
@@ -184,18 +184,26 @@ def upload():
     session['model'] = model
     session['enable_classification'] = enable_classification
 
-    # Validate and save files
+    # Validate and save files with unique prefixes to prevent collisions
     valid_files = []
-    file_handler = FileHandler()
+    file_prefix = str(uuid.uuid4())[:8]  # Unique prefix for this batch
 
     for file in files:
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            valid_files.append(filepath)
+            # Add unique prefix to prevent collisions if same filename uploaded later
+            unique_filename = f"{file_prefix}_{filename}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            try:
+                file.save(filepath)
+                valid_files.append(filepath)
+            except Exception as e:
+                logger.error(f"Failed to save file {filename}: {e}")
+                flash(f'Failed to save file: {markupsafe.escape(filename)}')
         else:
-            flash(f'Invalid file type: {file.filename}')
+            # Sanitize filename before displaying in flash message
+            safe_filename = markupsafe.escape(file.filename) if file else "unknown"
+            flash(f'Invalid file type: {safe_filename}')
 
     if not valid_files:
         flash('No valid files uploaded')
@@ -600,112 +608,66 @@ def get_models_for_provider(provider):
 
 @app.route('/download/<run_id>')
 def download_results(run_id):
-    """Download results for a specific run ID"""
-    # ===================================================================
-    # TODO SECURITY: Implement Database-Backed Ownership Authorization
-    # ===================================================================
-    # Current implementation: Weak (session-only validation)
-    #   - Only checks if run_id matches session['current_run_id']
-    #   - Session can be manipulated/stolen
-    #   - No persistent ownership tracking
-    #
-    # Required Enhancements:
-    #
-    # 1. DATABASE SCHEMA CHANGES (src/core/results_store.py):
-    #    - Add ownership tracking columns to pipeline_runs table
-    #    - Store session_id, user_ip, user_agent on every upload
-    #    - Add created_at, expires_at for automatic cleanup
-    #
-    #    ALTER TABLE pipeline_runs ADD COLUMN IF NOT EXISTS:
-    #      - session_owner TEXT NOT NULL  (from request.cookies['session'])
-    #      - ip_owner TEXT                (from request.remote_addr)
-    #      - user_agent TEXT             (from request.headers['User-Agent'])
-    #      - created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    #      - expires_at TIMESTAMP        (created_at + 24 hours)
-    #
-    #    CREATE INDEX idx_session_owner ON pipeline_runs(session_owner);
-    #    CREATE INDEX idx_expires_at ON pipeline_runs(expires_at);
-    #
-    # 2. STORAGE CHANGES (flask_app.py:291-300):
-    #    Update store_processing_result() call to include:
-    #      session_info = {
-    #          'session_id': request.cookies.get('session'),
-    #          'user_ip': request.remote_addr,
-    #          'user_agent': request.headers.get('User-Agent'),
-    #      }
-    #
-    # 3. RETRIEVAL CHANGES (this function):
-    #    Replace session-only check with database ownership verification:
-    #
-    #    result = results_store.get_processing_result_with_ownership(run_id)
-    #    if not result:
-    #        abort(404)  # Not found
-    #
-    #    current_session = request.cookies.get('session')
-    #    if result['session_owner'] != current_session:
-    #        logger.warning(f"Unauthorized download attempt: {run_id} by {current_session}")
-    #        abort(403)  # Forbidden - not your data
-    #
-    # 4. CLEANUP JOB (new route: /admin/cleanup-expired):
-    #    Periodically delete expired results:
-    #      DELETE FROM pipeline_runs WHERE expires_at < CURRENT_TIMESTAMP;
-    #
-    # 5. RATE LIMITING (optional - requires flask-limiter):
-    #    @limiter.limit("10 per minute")
-    #    def download_results(run_id):
-    #        ...
-    #
-    # Security Impact:
-    #   - Current: Run ID brute force = 16^16 attempts (now improved from 16^8)
-    #   - Enhanced: Run ID + session match required (adds 2^256 session entropy)
-    #   - Result: Effectively impossible to access other users' data
-    # ===================================================================
+    """Download results for a specific run ID with authorization"""
+    # Validate run_id format - must be exactly 16 hex characters (from uuid)
+    if not re.match(r'^[0-9A-F]{16}$', run_id):
+        logger.warning(f"Invalid run_id format attempted: {run_id}")
+        abort(400)  # Bad request - invalid format
 
-    # Current (weak) implementation - session-only check
+    # Authorization check - verify run_id matches session
+    # NOTE: This is session-based auth. For production, implement database-backed
+    # ownership tracking with IP, user agent, and session verification.
     current_run_id = session.get('current_run_id')
     if current_run_id != run_id:
-        flash('Invalid or expired run ID')
-        return redirect(url_for('index'))
+        logger.warning(f"Unauthorized download attempt: {run_id} from session {current_run_id}")
+        abort(403)  # Forbidden - deny without info leak
 
     # Get results from DuckDB
     results_store = get_results_store()
     result_data = results_store.get_processing_result(run_id)
 
     if not result_data or not result_data['events']:
-        flash('No results available for download')
-        return redirect(url_for('index'))
+        logger.warning(f"No results found for run_id: {run_id}")
+        abort(404)  # Not found - don't redirect, just 404
 
     try:
         # Convert events to DataFrame
         events = result_data['events']
         results_df = pd.DataFrame(events)
 
-    # Create CSV response
+        # Create CSV response
         csv_buffer = StringIO()
         results_df.to_csv(csv_buffer, index=False)
         csv_data = csv_buffer.getvalue()
+
+        # Encode to bytes for proper Content-Length
+        csv_bytes = csv_data.encode('utf-8')
 
         # Generate filename with run ID
         filename = f"legal_events_{run_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
         from flask import Response
         return Response(
-            csv_data,
-            mimetype='text/csv',
+            csv_bytes,
+            mimetype='text/csv; charset=utf-8',
             headers={
-                'Content-Disposition': f'attachment; filename={filename}',
-                'Content-Length': len(csv_data)
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Length': str(len(csv_bytes))  # Length in bytes, not characters
             }
         )
 
     except Exception as e:
-        logger.error(f'Download error: {e}')
-        flash('Error generating download file')
-        return redirect(url_for('results'))
+        logger.error(f'Download error for run_id {run_id}: {e}')
+        abort(500)  # Internal server error
 
 @app.route('/test')
 def test():
-    """Simple test endpoint to verify the app works"""
+    """Simple test endpoint to verify the app works (development only)"""
+    # Guard: Only expose in development mode
+    if not app.debug and os.getenv('FLASK_ENV') != 'development':
+        logger.warning("/test endpoint accessed in production - denying")
+        abort(404)
+
     # Check API key availability
     api_keys_status = {
         'GEMINI_API_KEY': bool(os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')),
@@ -719,65 +681,53 @@ def test():
     return jsonify({
         'status': 'ok',
         'message': 'Flask Legal Events Extraction API with Process Handover',
+        'environment': 'DEVELOPMENT' if app.debug else 'PRODUCTION',
         'api_keys_available': api_keys_status,
         'session_info': {
             'has_results': 'results' in session,
             'has_run_id': 'current_run_id' in session,
             'run_id': session.get('current_run_id', 'None'),
-            'session_keys': list(session.keys())
         },
-        'endpoints': [
-            'GET / - Main page with status indicators',
-            'POST /upload - File processing with unique run IDs',
-            'GET /results - View results for current session only',
-            'GET /download/<run_id> - Download CSV with run ID validation',
-            'GET /debug - Session debugging info',
-            'POST /clear - Clear session data',
-            'POST /api/cost-estimate - Cost estimation',
-            'GET /api/providers - Provider status',
-            'GET /api/models/<provider> - Models for provider'
-        ],
-        'features': [
-            '🔄 Process handover - each upload gets unique run ID',
-            '🧹 Fresh results - no mixing with previous runs',
-            '📥 Automatic download - CSV with run ID in filename',
-            '🔒 Session validation - results tied to current upload',
-            '📊 Processing indicators - real-time status updates',
-            '🏷️ Document classification - optional AI categorization',
-            '🔍 Debug endpoints for troubleshooting',
-            '🔄 Dynamic model loading - automatically picks up new backend models'
-        ],
         'model_catalog_size': len(get_ui_model_config_list())
     })
 
 @app.route('/debug')
 def debug():
-    """Debug endpoint to check session and app state"""
+    """Debug endpoint to check session and app state (development only)"""
+    # Guard: Only expose in development mode
+    if not app.debug and os.getenv('FLASK_ENV') != 'development':
+        logger.warning("/debug endpoint accessed in production - denying")
+        abort(404)
+
     return jsonify({
-        'session_keys': list(session.keys()),
         'session_data': {
             'current_run_id': session.get('current_run_id', 'Not set'),
-        },
-        'database_info': {
-            'results_store_available': True,
-            'current_run_id': session.get('current_run_id', 'None'),
         },
         'app_config': {
             'model_catalog_size': len(get_ui_model_config_list()),
             'debug_mode': app.debug,
-            'secret_key_set': bool(app.secret_key)
         }
     })
 
 @app.route('/clear', methods=['POST'])
 def clear_session():
-    """Clear all session data for debugging"""
+    """Clear all session data for debugging (development only)"""
+    # Guard: Only expose in development mode
+    if not app.debug and os.getenv('FLASK_ENV') != 'development':
+        logger.warning("/clear endpoint accessed in production - denying")
+        abort(404)
+
     session.clear()
     return jsonify({'status': 'cleared', 'message': 'Session data cleared'})
 
 @app.route('/refresh-models', methods=['POST'])
 def refresh_models():
-    """Force refresh model catalog (useful for development)"""
+    """Force refresh model catalog (development only)"""
+    # Guard: Only expose in development mode
+    if not app.debug and os.getenv('FLASK_ENV') != 'development':
+        logger.warning("/refresh-models endpoint accessed in production - denying")
+        abort(404)
+
     fresh_catalog = get_ui_model_config_list()
     return jsonify({
         'status': 'refreshed',
@@ -787,7 +737,12 @@ def refresh_models():
 
 @app.route('/test-session', methods=['GET', 'POST'])
 def test_session():
-    """Test session persistence across requests"""
+    """Test session persistence across requests (development only)"""
+    # Guard: Only expose in development mode
+    if not app.debug and os.getenv('FLASK_ENV') != 'development':
+        logger.warning("/test-session endpoint accessed in production - denying")
+        abort(404)
+
     if request.method == 'POST':
         # Store test data
         test_data = request.form.get('test_data', 'test_value')
@@ -796,7 +751,6 @@ def test_session():
         return jsonify({
             'status': 'stored',
             'data': test_data,
-            'session_keys': list(session.keys())
         })
     else:
         # Retrieve test data
@@ -804,7 +758,6 @@ def test_session():
             'status': 'retrieved',
             'data': session.get('test_data', 'not_found'),
             'timestamp': session.get('test_timestamp', 'not_found'),
-            'session_keys': list(session.keys())
         })
 
 @app.errorhandler(RequestEntityTooLarge)
