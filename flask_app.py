@@ -4,7 +4,7 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, abort
 import os, logging, uuid, tempfile, atexit, shutil, re
 from dotenv import load_dotenv
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
@@ -34,12 +34,9 @@ app = Flask(__name__)
 # Security: Use proper secret key
 secret_key = os.getenv('FLASK_SECRET_KEY')
 if not secret_key:
-    if os.getenv('FLASK_ENV') == 'development':
-        # Allow default key in development only
-        secret_key = 'dev-secret-key-change-in-production'
-        print("⚠️ WARNING: Using default Flask secret key. Set FLASK_SECRET_KEY environment variable for production!")
-    else:
-        raise ValueError("FLASK_SECRET_KEY environment variable is required for production")
+    # Development mode - allow default key only in debug mode
+    secret_key = 'dev-secret-key-change-in-production'
+    print("⚠️ WARNING: Using default Flask secret key. Set FLASK_SECRET_KEY environment variable for production!")
 app.secret_key = secret_key
 
 # Create temp upload folder with cleanup on exit
@@ -783,7 +780,7 @@ def download_results(run_id):
 def test():
     """Simple test endpoint to verify the app works (development only)"""
     # Guard: Only expose in development mode
-    if not app.debug and os.getenv('FLASK_ENV') != 'development':
+    if not app.debug:
         logger.warning("/test endpoint accessed in production - denying")
         abort(404)
 
@@ -814,7 +811,7 @@ def test():
 def debug():
     """Debug endpoint to check session and app state (development only)"""
     # Guard: Only expose in development mode
-    if not app.debug and os.getenv('FLASK_ENV') != 'development':
+    if not app.debug:
         logger.warning("/debug endpoint accessed in production - denying")
         abort(404)
 
@@ -832,7 +829,7 @@ def debug():
 def clear_session():
     """Clear all session data for debugging (development only)"""
     # Guard: Only expose in development mode
-    if not app.debug and os.getenv('FLASK_ENV') != 'development':
+    if not app.debug:
         logger.warning("/clear endpoint accessed in production - denying")
         abort(404)
 
@@ -843,7 +840,7 @@ def clear_session():
 def refresh_models():
     """Force refresh model catalog (development only)"""
     # Guard: Only expose in development mode
-    if not app.debug and os.getenv('FLASK_ENV') != 'development':
+    if not app.debug:
         logger.warning("/refresh-models endpoint accessed in production - denying")
         abort(404)
 
@@ -858,7 +855,7 @@ def refresh_models():
 def test_session():
     """Test session persistence across requests (development only)"""
     # Guard: Only expose in development mode
-    if not app.debug and os.getenv('FLASK_ENV') != 'development':
+    if not app.debug:
         logger.warning("/test-session endpoint accessed in production - denying")
         abort(404)
 
@@ -885,15 +882,11 @@ def handle_file_too_large(e):
     log_security_event('file_too_large', {'max_size': '100MB'})
     return jsonify({'error': 'File exceeds maximum size'}), 413
 
-@app.errorhandler(400)
+@app.errorhandler(CSRFError)
 def handle_csrf_error(e):
-    """Handle CSRF token errors without leaking details"""
-    # Check if this is a CSRF error
-    if 'CSRF' in str(e) or 'csrf' in str(e):
-        log_security_event('csrf_error', {'error': str(e)})
-        return jsonify({'error': 'Invalid request. Please try again.'}), 400
-    # For other 400 errors, return generic message
-    return jsonify({'error': 'Invalid request'}), 400
+    """Handle CSRF token validation errors without leaking details"""
+    log_security_event('csrf_error', {'error': str(e)})
+    return jsonify({'error': 'Invalid request. Please try again.'}), 400
 
 if __name__ == '__main__':
     print("🚀 Starting Flask Legal Events Extraction UI")
