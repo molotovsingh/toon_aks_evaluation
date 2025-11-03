@@ -5,7 +5,7 @@ Core Docling-to-legal-events pipeline lives under `src/core/`; `extractor_factor
 
 ## Build, Test, and Development Commands
 - `uv sync` installs pinned dependencies from `pyproject.toml` and `uv.lock`.
-- `uv run streamlit run app.py` boots the primary UI; swap in `examples/*.py` to explore demos.
+- `uv run python3 -m streamlit run app.py` boots the primary UI; swap in `examples/*.py` to explore demos. **Note:** Use the module syntax (`-m streamlit`) instead of direct command (`streamlit run`) to avoid "Failed to spawn: streamlit" errors with uv.
 - `uv run python src/main.py` executes the CLI harness for scripted LangExtract runs.
 - `uv run python tests/run_all_tests.py --quick` runs the smoke suite; drop `--quick` for full coverage.
 - `uv run pytest tests/test_specific_file.py` runs a single test file; use `::test_function` for specific tests.
