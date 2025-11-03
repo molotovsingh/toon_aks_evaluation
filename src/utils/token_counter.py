@@ -96,20 +96,27 @@ def count_tokens(text: str, model_id: str) -> int:
 
     Raises:
         ValueError: If model_id not supported
-        TiktokenTokenCountingError: If tiktoken fails to count
+        RuntimeError: If tiktoken fails to count
 
     Example:
         >>> tokens = count_tokens("Hello world", "gpt-4o")
         >>> print(f"Input tokens: {tokens}")
         Input tokens: 2
     """
-    encoding_name = MODEL_TO_ENCODING.get(model_id, DEFAULT_ENCODING)
+    # Validate model_id is supported (do not silently fall back to DEFAULT_ENCODING)
+    if model_id not in MODEL_TO_ENCODING:
+        raise ValueError(
+            f"Model '{model_id}' not supported for token counting. "
+            f"Supported models: {', '.join(get_supported_models())}"
+        )
+
+    encoding_name = MODEL_TO_ENCODING[model_id]
 
     try:
         enc = tiktoken.get_encoding(encoding_name)
         return len(enc.encode(text))
     except Exception as e:
-        raise Exception(f"Failed to count tokens for model '{model_id}': {str(e)}")
+        raise RuntimeError(f"Failed to count tokens for model '{model_id}': {str(e)}") from e
 
 
 def count_tokens_batch(texts: List[str], model_id: str) -> int:

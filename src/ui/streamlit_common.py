@@ -895,6 +895,10 @@ def show_cost_aware_model_selection(
     # ========================================================================
     st.subheader("📄 Stage 1: Extract Text (FREE)")
 
+    # Create cache key based on current files and extractor (for invalidation)
+    file_key = ":".join(f.name for f in uploaded_files) if uploaded_files else ""
+    cache_key = f"{file_key}:{doc_extractor or 'docling'}"
+
     if st.button(
         "🔽 Extract Text with Docling",
         help="Extract and parse text from documents (no API calls, completely free)",
@@ -909,51 +913,63 @@ def show_cost_aware_model_selection(
         )
 
         if extracted_texts:
-            # Store in session state for reuse
+            # Store in session state with cache metadata for invalidation
             st.session_state['extracted_texts_for_cost'] = extracted_texts
+            st.session_state['extracted_texts_cache_key'] = cache_key
             st.success(f"✅ Extracted {len(extracted_texts)} document(s)")
             st.rerun()  # Refresh to show cost table
-        else:
-            st.error("❌ Text extraction failed")
-            return None
 
     # ========================================================================
     # STAGE 2: Cost-Aware Model Selection
     # ========================================================================
+    # Validate cache before reusing extracted texts
     if 'extracted_texts_for_cost' in st.session_state:
-        extracted_texts = st.session_state['extracted_texts_for_cost']
-
-        st.divider()
-        st.subheader("💰 Stage 2: Select Model by Cost & Quality")
-
-        # Calculate costs with tiktoken (exact token counts)
-        from .cost_estimator import estimate_all_models_with_tiktoken
-        from .cost_comparison import show_cost_comparison_selector
-
-        with st.spinner("📊 Calculating costs with tiktoken..."):
-            cost_table = estimate_all_models_with_tiktoken(
-                extracted_texts=extracted_texts,
-                output_ratio=0.10
-            )
-
-        if cost_table:
-            st.info(
-                f"📋 Based on {len(extracted_texts)} document(s) with "
-                f"{sum(len(t) for t in extracted_texts):,} characters"
-            )
-
-            # Show cost-aware selector
-            selected_model = show_cost_comparison_selector(
-                cost_table=cost_table,
-                default_model="claude-3-haiku-20240307",  # Recommended: fastest production model
-                show_summary=True
-            )
-
-            # Store selected model in session state
-            if selected_model:
-                st.session_state['selected_model_for_processing'] = selected_model
-                return selected_model
+        # Check if cache is still valid (same files + extractor)
+        cached_key = st.session_state.get('extracted_texts_cache_key', '')
+        if cached_key != cache_key:
+            # Cache invalidated - clear it
+            del st.session_state['extracted_texts_for_cost']
+            del st.session_state['extracted_texts_cache_key']
         else:
-            st.warning("⚠️ Could not calculate model costs")
+            # Cache valid - use extracted texts
+            extracted_texts = st.session_state['extracted_texts_for_cost']
+
+            st.divider()
+            st.subheader("💰 Stage 2: Select Model by Cost & Quality")
+
+            # Calculate costs with tiktoken (exact token counts)
+            from .cost_estimator import estimate_all_models_with_tiktoken
+            from .cost_comparison import show_cost_comparison_selector
+
+            try:
+                with st.spinner("📊 Calculating costs with tiktoken..."):
+                    cost_table = estimate_all_models_with_tiktoken(
+                        extracted_texts=extracted_texts,
+                        output_ratio=0.10
+                    )
+
+                if cost_table:
+                    st.info(
+                        f"📋 Based on {len(extracted_texts)} document(s) with "
+                        f"{sum(len(t) for t in extracted_texts):,} characters"
+                    )
+
+                    # Show cost-aware selector
+                    selected_model = show_cost_comparison_selector(
+                        cost_table=cost_table,
+                        default_model="claude-3-haiku-20240307",  # Recommended: fastest production model
+                        show_summary=True
+                    )
+
+                    # Store selected model in session state
+                    if selected_model:
+                        st.session_state['selected_model_for_processing'] = selected_model
+                        return selected_model
+                else:
+                    st.warning("⚠️ Could not calculate model costs")
+            except Exception as e:
+                logger.exception(f"Cost calculation failed: {e}")
+                st.error(f"❌ Cost calculation failed: {str(e)}")
+                return None
 
     return None

@@ -237,9 +237,10 @@ def show_cost_comparison_selector(
         )
 
         if selected_info:
+            quality = selected_info.get("quality_score", "N/A")
             st.success(
                 f"✅ Selected: **{selected_info['display_name']}** "
-                f"(${selected_info['total_cost']:.4f}, {selected_info['quality_score']})"
+                f"(${selected_info['total_cost']:.4f}, {quality})"
             )
             return final_selection
 
@@ -355,8 +356,10 @@ def show_cost_breakdown(cost_table: List[Dict], selected_model_id: str) -> None:
     st.divider()
     st.subheader("📊 Comparison")
 
-    cheapest = cost_table[0]  # Already sorted by cost
-    most_expensive = cost_table[-1]
+    # Create local sorted copy to avoid assuming cost_table is pre-sorted
+    sorted_by_cost = sorted(cost_table, key=lambda m: m['total_cost'])
+    cheapest = sorted_by_cost[0]
+    most_expensive = sorted_by_cost[-1]
 
     col1, col2, col3 = st.columns(3)
 
