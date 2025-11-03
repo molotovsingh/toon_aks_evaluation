@@ -42,7 +42,7 @@ app.secret_key = secret_key
 # Create temp upload folder with cleanup on exit
 upload_folder = tempfile.mkdtemp()
 app.config['UPLOAD_FOLDER'] = upload_folder
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB limit
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB limit
 app.config['SESSION_PERMANENT'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
 
@@ -80,27 +80,44 @@ class FlaskUploadedFile:
     def __init__(self, file_path: str):
         self.file_path = file_path
         self.name = os.path.basename(file_path)
-        self._file_obj = None
+        self._buffer = None
+        self._position = 0
 
     def getbuffer(self):
         """Read file contents into buffer with proper resource cleanup"""
-        with open(self.file_path, 'rb') as f:
-            return f.read()
+        if self._buffer is None:
+            with open(self.file_path, 'rb') as f:
+                self._buffer = f.read()
+        return self._buffer
 
-    def read(self):
-        """Read file contents (calls getbuffer for compatibility)"""
-        return self.getbuffer()
+    def read(self, size: int = -1):
+        """Read file contents (supports partial reads like file objects)"""
+        buffer = self.getbuffer()
+        if size == -1:
+            # Read all remaining bytes from current position
+            result = buffer[self._position:]
+            self._position = len(buffer)
+        else:
+            # Read 'size' bytes from current position
+            result = buffer[self._position:self._position + size]
+            self._position += len(result)
+        return result
 
-    def seek(self, position):
-        """Seek to position (no-op for buffer-based reading)"""
-        if self._file_obj:
-            self._file_obj.seek(position)
+    def seek(self, position: int, whence: int = 0):
+        """Seek to position in file (supports SEEK_SET, SEEK_CUR, SEEK_END)"""
+        buffer = self.getbuffer()
+        if whence == 0:  # SEEK_SET (absolute position)
+            self._position = max(0, min(position, len(buffer)))
+        elif whence == 1:  # SEEK_CUR (relative to current position)
+            self._position = max(0, min(self._position + position, len(buffer)))
+        elif whence == 2:  # SEEK_END (relative to end)
+            self._position = max(0, min(len(buffer) + position, len(buffer)))
+        return self._position
 
     def close(self):
-        """Close file handle if open"""
-        if self._file_obj:
-            self._file_obj.close()
-            self._file_obj = None
+        """Close file handle and clear buffer"""
+        self._buffer = None
+        self._position = 0
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -434,24 +451,100 @@ def results():
 
 @app.route('/api/cost-estimate', methods=['POST'])
 def cost_estimate():
-    """API endpoint for cost estimation"""
+    """API endpoint for cost estimation using tiktoken for accuracy"""
+    # Validate request has JSON data
+    if not request.json:
+        return jsonify({
+            'error': 'Invalid request',
+            'message': 'Request body must be JSON'
+        }), 400
+
     data = request.json
     provider = data.get('provider')
     model = data.get('model')
-    file_sizes = data.get('file_sizes', [])
+    text_content = data.get('text_content')  # Extracted text for token counting
 
-    # Use existing cost estimation logic
-    from src.ui.streamlit_common import display_cost_estimates
+    # Validate required fields
+    if not provider:
+        return jsonify({
+            'error': 'Missing provider',
+            'message': 'Provider field is required'
+        }), 400
 
-    # Mock cost calculation (would need to adapt display_cost_estimates)
-    estimated_cost = len(file_sizes) * 0.01  # Placeholder
+    try:
+        # Import cost estimation functions
+        from src.ui.cost_estimator import estimate_all_models_with_tiktoken
+        from src.core.model_catalog import get_ui_model_config_list
 
-    return jsonify({
-        'estimated_cost': estimated_cost,
-        'currency': 'USD',
-        'provider': provider,
-        'model': model
-    })
+        # If text is provided, use tiktoken for precise cost calculation
+        if text_content:
+            try:
+                cost_table = estimate_all_models_with_tiktoken(
+                    extracted_texts=[text_content],
+                    output_ratio=0.10
+                )
+
+                # Filter by provider if specified
+                if provider:
+                    cost_table = [m for m in cost_table if m.get('provider') == provider]
+
+                # Filter by model if specified
+                if model and cost_table:
+                    cost_table = [m for m in cost_table if m.get('model_id') == model]
+
+                if cost_table:
+                    selected = cost_table[0]
+                    return jsonify({
+                        'success': True,
+                        'estimated_cost': selected['total_cost'],
+                        'currency': 'USD',
+                        'input_tokens': selected['input_tokens'],
+                        'output_tokens': selected['output_tokens'],
+                        'total_tokens': selected['input_tokens'] + selected['output_tokens'],
+                        'input_cost': selected['input_cost'],
+                        'output_cost': selected['output_cost'],
+                        'provider': provider,
+                        'model': model,
+                        'method': 'tiktoken_actual'
+                    })
+            except Exception as e:
+                logger.warning(f"Tiktoken cost calculation failed, falling back to heuristic: {e}")
+
+        # Fallback: Use heuristic estimation if no text provided or tiktoken fails
+        model_catalog = get_ui_model_config_list()
+        matching_models = [
+            m for m in model_catalog
+            if (not provider or m.provider == provider) and
+               (not model or m.model_id == model)
+        ]
+
+        if matching_models:
+            selected_model = matching_models[0]
+            # Rough estimate: assume 1000 tokens per page for legal documents
+            estimated_tokens = 1000
+            estimated_cost = (estimated_tokens / 1_000_000) * selected_model.cost_per_1m
+            return jsonify({
+                'success': True,
+                'estimated_cost': estimated_cost,
+                'currency': 'USD',
+                'estimated_tokens': estimated_tokens,
+                'provider': provider,
+                'model': model,
+                'method': 'heuristic_fallback',
+                'warning': 'Using heuristic estimation (no text provided for precise calculation)'
+            })
+        else:
+            return jsonify({
+                'error': 'Model not found',
+                'message': f'No model found for provider={provider}, model={model}'
+            }), 404
+
+    except Exception as e:
+        logger.error(f'Cost estimation error: {e}')
+        return jsonify({
+            'error': 'Cost estimation failed',
+            'message': str(e)
+        }), 500
 
 @app.route('/api/providers')
 def get_providers():
@@ -719,13 +812,13 @@ def handle_file_too_large(e):
     """Handle file uploads that exceed MAX_CONTENT_LENGTH"""
     return jsonify({
         'error': 'File too large',
-        'message': 'The uploaded file exceeds the maximum allowed size of 50MB.',
-        'max_size': '50MB'
+        'message': 'The uploaded file exceeds the maximum allowed size of 100MB.',
+        'max_size': '100MB'
     }), 413
 
 if __name__ == '__main__':
     print("🚀 Starting Flask Legal Events Extraction UI")
-    print("🏠 Main page: http://localhost:5001/")
+    print("🏠 Main page: http://localhost:53335/")
     print("✅ Templates loaded and ready!")
 
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=True, host='0.0.0.0', port=53335)

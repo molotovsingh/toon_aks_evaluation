@@ -37,11 +37,34 @@
         </div>
 
         <form action="/upload" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="form-group">
-                <label for="files">Select Files:</label>
-                <input type="file" id="files" name="files" multiple required
-                       accept=".pdf,.docx,.txt,.msg,.eml,.jpg,.jpeg,.png">
-                <small>Supported: PDF, DOCX, TXT, MSG, EML, JPG, JPEG, PNG</small>
+                <label>Select Files or Folder:</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <button type="button" id="filesBtn" onclick="document.getElementById('files').click()"
+                            style="flex: 1; background: #28a745; padding: 12px;">
+                        📄 Choose Files
+                    </button>
+                    <button type="button" id="folderBtn" onclick="document.getElementById('folder').click()"
+                            style="flex: 1; background: #17a2b8; padding: 12px;"
+                            title="Select a folder to upload all files inside it">
+                        📁 Choose Folder
+                    </button>
+                </div>
+                <input type="file" id="files" name="fileInput_single" multiple
+                       accept=".pdf,.docx,.txt,.msg,.eml,.jpg,.jpeg,.png"
+                       style="display: none;" onchange="updateFileCount(this)">
+                <input type="file" id="folder" name="fileInput_folder" multiple webkitdirectory
+                       style="display: none;" onchange="updateFileCount(this)">
+                <!-- Hidden input that will be populated by JavaScript to ensure proper form submission -->
+                <input type="hidden" id="files_actual" name="files" value="">
+                <div id="file-count" style="padding: 10px; background: #f8f9fa; border-radius: 5px; display: none;">
+                    <strong id="count-text">No files selected</strong>
+                </div>
+                <small style="display: block; margin-top: 5px;">Supported: PDF, DOCX, TXT, MSG, EML, JPG, JPEG, PNG</small>
+                <small id="browser-warning" style="display: none; color: #dc3545; margin-top: 5px;">
+                    ⚠️ Folder selection is not supported in your browser. Use file selection instead.
+                </small>
             </div>
 
             <div class="form-group">
@@ -113,6 +136,85 @@
     </div>
 
     <script>
+        // Check browser support for webkitdirectory on page load
+        window.addEventListener('load', function() {
+            checkFolderSupport();
+            setupFormSubmission();
+        });
+
+        // Check if browser supports webkitdirectory (folder selection)
+        function checkFolderSupport() {
+            const folderInput = document.getElementById('folder');
+            const folderBtn = document.getElementById('folderBtn');
+            const browserWarning = document.getElementById('browser-warning');
+
+            // Test if webkitdirectory is supported
+            const supportsWebkitDirectory = 'webkitdirectory' in folderInput;
+
+            if (!supportsWebkitDirectory) {
+                // Browser doesn't support folder selection
+                folderBtn.disabled = true;
+                folderBtn.style.opacity = '0.5';
+                folderBtn.style.cursor = 'not-allowed';
+                folderBtn.title = 'Folder selection is not supported in your browser (Firefox limitation). Use file selection instead.';
+                browserWarning.style.display = 'block';
+            }
+        }
+
+        // File/Folder selection handler with proper form submission preparation
+        function updateFileCount(input) {
+            const fileCount = input.files.length;
+            const countDiv = document.getElementById('file-count');
+            const countText = document.getElementById('count-text');
+            const sourceType = input.id === 'folder' ? 'folder' : 'file selection';
+
+            if (fileCount > 0) {
+                countText.textContent = `✅ ${fileCount} file${fileCount > 1 ? 's' : ''} selected from ${sourceType}`;
+                countDiv.style.display = 'block';
+            } else {
+                countText.textContent = 'No files selected';
+                countDiv.style.display = 'none';
+            }
+        }
+
+        // Setup form submission to handle file input consolidation
+        function setupFormSubmission() {
+            const form = document.querySelector('form[action="/upload"]');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    // Get the active input with files
+                    const filesInput = document.getElementById('files');
+                    const folderInput = document.getElementById('folder');
+                    const hiddenFilesInput = document.getElementById('files_actual');
+
+                    // Determine which input has files
+                    let activeInput = null;
+                    if (filesInput.files.length > 0) {
+                        activeInput = filesInput;
+                    } else if (folderInput.files.length > 0) {
+                        activeInput = folderInput;
+                    }
+
+                    // If no files selected, prevent submission
+                    if (!activeInput) {
+                        e.preventDefault();
+                        alert('Please select at least one file');
+                        return false;
+                    }
+
+                    // Note: We cannot programmatically populate file input for security reasons
+                    // Instead, rename the active input to "files" before submission
+                    if (activeInput === filesInput) {
+                        filesInput.name = 'files';
+                        folderInput.name = 'fileInput_folder_disabled';
+                    } else {
+                        folderInput.name = 'files';
+                        filesInput.name = 'fileInput_single_disabled';
+                    }
+                });
+            }
+        }
+
         // Dynamic model loading based on provider selection
         const providerInputs = document.querySelectorAll('input[name="provider"]');
         const modelGroup = document.getElementById('model-group');
@@ -262,6 +364,17 @@
         const statusMessage = document.getElementById('status-message');
 
         form.addEventListener('submit', function(e) {
+            // Validate that at least one file is selected
+            const filesInput = document.getElementById('files');
+            const folderInput = document.getElementById('folder');
+            const totalFiles = filesInput.files.length + folderInput.files.length;
+
+            if (totalFiles === 0) {
+                e.preventDefault();
+                alert('Please select at least one file or folder before processing.');
+                return false;
+            }
+
             // Show processing indicator
             processingStatus.style.display = 'block';
 
