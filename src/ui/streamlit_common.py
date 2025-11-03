@@ -846,3 +846,114 @@ def display_cache_info(location: str = "sidebar") -> None:
                 if st.button("Clear Cache"):
                     clear_document_cache()
                     st.rerun()
+
+
+# ============================================================================
+# TWO-STAGE COST-AWARE MODEL SELECTION (Post-Docling)
+# ============================================================================
+
+def show_cost_aware_model_selection(
+    uploaded_files: List,
+    provider: Optional[str] = None,
+    runtime_model: Optional[str] = None,
+    doc_extractor: Optional[str] = None
+) -> Optional[str]:
+    """
+    Two-stage model selection with tiktoken-based cost estimation.
+
+    Stage 1 (FREE): Extract text with Docling
+    Stage 2 (INFORMED): Show exact costs for all models using tiktoken,
+                        let user pick model based on cost/quality tradeoff
+
+    This enables users to make informed decisions about cost vs accuracy
+    BEFORE making expensive API calls.
+
+    Args:
+        uploaded_files: List of uploaded file objects
+        provider: Default provider (optional, for pipeline init)
+        runtime_model: Default model (optional)
+        doc_extractor: Document extractor ID ('docling', 'qwen_vl', 'gemini')
+
+    Returns:
+        Selected model_id string, or None if no selection made
+
+    Example:
+        >>> uploaded_files = st.file_uploader("Choose files", accept_multiple_files=True)
+        >>> if uploaded_files:
+        ...     selected_model = show_cost_aware_model_selection(
+        ...         uploaded_files,
+        ...         doc_extractor='docling'
+        ...     )
+        ...     if selected_model:
+        ...         st.success(f"Processing with {selected_model}")
+    """
+    if not uploaded_files:
+        return None
+
+    # ========================================================================
+    # STAGE 1: Extract Text (FREE)
+    # ========================================================================
+    st.subheader("📄 Stage 1: Extract Text (FREE)")
+
+    if st.button(
+        "🔽 Extract Text with Docling",
+        help="Extract and parse text from documents (no API calls, completely free)",
+        use_container_width=True
+    ):
+        # Extract using existing function
+        extracted_texts = extract_all_documents_for_estimation(
+            uploaded_files=uploaded_files,
+            provider=provider,
+            runtime_model=runtime_model,
+            doc_extractor=doc_extractor
+        )
+
+        if extracted_texts:
+            # Store in session state for reuse
+            st.session_state['extracted_texts_for_cost'] = extracted_texts
+            st.success(f"✅ Extracted {len(extracted_texts)} document(s)")
+            st.rerun()  # Refresh to show cost table
+        else:
+            st.error("❌ Text extraction failed")
+            return None
+
+    # ========================================================================
+    # STAGE 2: Cost-Aware Model Selection
+    # ========================================================================
+    if 'extracted_texts_for_cost' in st.session_state:
+        extracted_texts = st.session_state['extracted_texts_for_cost']
+
+        st.divider()
+        st.subheader("💰 Stage 2: Select Model by Cost & Quality")
+
+        # Calculate costs with tiktoken (exact token counts)
+        from .cost_estimator import estimate_all_models_with_tiktoken
+        from .cost_comparison import show_cost_comparison_selector
+
+        with st.spinner("📊 Calculating costs with tiktoken..."):
+            cost_table = estimate_all_models_with_tiktoken(
+                extracted_texts=extracted_texts,
+                output_ratio=0.10
+            )
+
+        if cost_table:
+            st.info(
+                f"📋 Based on {len(extracted_texts)} document(s) with "
+                f"{sum(len(t) for t in extracted_texts):,} characters"
+            )
+
+            # Show cost-aware selector
+            selected_model = show_cost_comparison_selector(
+                cost_table=cost_table,
+                default_model="claude-3-haiku-20240307",  # Recommended: fastest production model
+                show_summary=True
+            )
+
+            # Store selected model in session state
+            if selected_model:
+                st.session_state['selected_model_for_processing'] = selected_model
+                return selected_model
+        else:
+            st.warning("⚠️ Could not calculate model costs")
+
+    return None

@@ -472,6 +472,178 @@ def estimate_all_models_two_layer(
 
 
 # ============================================================================
+# TIKTOKEN-BASED EXACT TOKEN COUNTING (Post-Docling)
+# ============================================================================
+
+def estimate_all_models_with_tiktoken(
+    extracted_texts: List[str],
+    output_ratio: float = 0.10
+) -> List[Dict]:
+    """
+    Calculate costs for ALL models using EXACT token counts from tiktoken.
+
+    This function should be called AFTER Docling extraction is complete.
+    It uses tiktoken (OpenAI's official library) for precise token counting,
+    then calculates costs across all available models.
+
+    Provides a sortable cost table for cost-aware model selection UI.
+
+    Args:
+        extracted_texts: List of extracted document texts (from Docling)
+        output_ratio: Estimated output/input ratio for cost calculation
+                     (default 0.10 = 10% of input for event extraction)
+
+    Returns:
+        List of dicts, sorted by total cost (cheapest first):
+        [
+            {
+                'model_id': 'deepseek-chat',
+                'display_name': 'DeepSeek Chat',
+                'provider': 'deepseek',
+                'category': 'Production',
+                'tier': 'production',
+                'input_tokens': 8234,
+                'output_tokens': 823,
+                'input_cost': 0.0012,
+                'output_cost': 0.0002,
+                'total_cost': 0.0014,
+                'cost_display': '$0.0014',
+                'quality_score': '9/10',
+                'speed_seconds': 5.2,
+                'supports_json': True
+            },
+            ...
+        ]
+
+    Example:
+        >>> from src.core.legal_pipeline_refactored import DoclingAdapter
+        >>> doc_extractor = DoclingAdapter()
+        >>> extracted = [doc_extractor.extract(f).markdown for f in files]
+        >>> cost_table = estimate_all_models_with_tiktoken(extracted)
+        >>> cheapest = cost_table[0]
+        >>> print(f"Cheapest: {cheapest['display_name']} at ${cheapest['total_cost']:.4f}")
+    """
+    try:
+        from ..utils.token_counter import count_tokens_batch, estimate_output_tokens
+    except ImportError:
+        logger.warning("tiktoken not available, falling back to character heuristic")
+        return estimate_all_models_with_heuristic(extracted_texts, output_ratio)
+
+    catalog = get_model_catalog()
+    results = []
+
+    for model in catalog.list_models():  # All models, no filters
+        model_id = model.model_id
+
+        try:
+            # Get exact input token count using tiktoken
+            input_tokens = count_tokens_batch(extracted_texts, model_id)
+
+            # Estimate output tokens based on task type
+            output_tokens = estimate_output_tokens(input_tokens, "event_extraction")
+
+            # Get pricing from catalog
+            pricing = catalog.get_pricing(model_id)
+
+            if not pricing:
+                logger.debug(f"Skipping {model_id}: no pricing data")
+                continue
+
+            # Calculate costs
+            input_cost = (input_tokens / 1_000_000) * pricing.get("cost_input_per_1m", 0)
+            output_cost = (output_tokens / 1_000_000) * pricing.get("cost_output_per_1m", 0)
+            total_cost = input_cost + output_cost
+
+            # Build result entry
+            results.append({
+                'model_id': model_id,
+                'display_name': model.display_name,
+                'provider': model.provider,
+                'category': model.category,
+                'tier': str(model.tier.value),
+                'input_tokens': input_tokens,
+                'output_tokens': output_tokens,
+                'input_cost': input_cost,
+                'output_cost': output_cost,
+                'total_cost': total_cost,
+                'cost_display': f"${total_cost:.4f}" if total_cost > 0 else model.cost_display,
+                'quality_score': model.quality_score or "N/A",
+                'speed_seconds': model.extraction_speed_seconds,
+                'supports_json': model.supports_json_mode,
+                'recommended': model.recommended,
+            })
+
+        except Exception as e:
+            logger.debug(f"Error calculating cost for {model_id}: {str(e)}")
+            continue
+
+    # Sort by total cost (cheapest first)
+    results.sort(key=lambda x: x['total_cost'])
+
+    return results
+
+
+def estimate_all_models_with_heuristic(
+    extracted_texts: List[str],
+    output_ratio: float = 0.10
+) -> List[Dict]:
+    """
+    Fallback: Calculate costs using character-based heuristic (no tiktoken).
+
+    Uses when tiktoken is not available or for quick estimates.
+    Less accurate than tiktoken but requires no additional dependencies.
+
+    Args:
+        extracted_texts: List of extracted document texts
+        output_ratio: Estimated output/input ratio
+
+    Returns:
+        List of cost estimates (same format as estimate_all_models_with_tiktoken)
+    """
+    catalog = get_model_catalog()
+    results = []
+
+    # Estimate total tokens using character heuristic
+    total_text = "".join(extracted_texts)
+    total_tokens = estimate_tokens(total_text)
+    input_tokens = int(total_tokens * (1.0 - output_ratio))
+    output_tokens = int(total_tokens * output_ratio)
+
+    for model in catalog.list_models():
+        model_id = model.model_id
+        pricing = catalog.get_pricing(model_id)
+
+        if not pricing:
+            continue
+
+        # Calculate costs
+        input_cost = (input_tokens / 1_000_000) * pricing.get("cost_input_per_1m", 0)
+        output_cost = (output_tokens / 1_000_000) * pricing.get("cost_output_per_1m", 0)
+        total_cost = input_cost + output_cost
+
+        results.append({
+            'model_id': model_id,
+            'display_name': model.display_name,
+            'provider': model.provider,
+            'category': model.category,
+            'tier': str(model.tier.value),
+            'input_tokens': input_tokens,
+            'output_tokens': output_tokens,
+            'input_cost': input_cost,
+            'output_cost': output_cost,
+            'total_cost': total_cost,
+            'cost_display': f"${total_cost:.4f}" if total_cost > 0 else model.cost_display,
+            'quality_score': model.quality_score or "N/A",
+            'speed_seconds': model.extraction_speed_seconds,
+            'supports_json': model.supports_json_mode,
+            'recommended': model.recommended,
+        })
+
+    results.sort(key=lambda x: x['total_cost'])
+    return results
+
+
+# ============================================================================
 # CALIBRATION HELPERS (for future refinement)
 # ============================================================================
 
