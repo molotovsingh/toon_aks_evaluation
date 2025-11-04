@@ -105,3 +105,8 @@ docs/benchmark_reports/
 
 # Git workflow order documentation (ephemeral)
 docs/orders/git-*-*.json
+
+# V2 proposal documents (work in progress)
+LEGAL_EVENTS_V2_PROPOSAL.md
+docs/v2/
+v2.zip
