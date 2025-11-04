@@ -1146,20 +1146,6 @@ def main():
                 st.info(f"📄 Ready to process: **{sample_path.name}** ({len(sample_bytes) / 1024:.0f} KB)")
 
         if files_to_process:
-            # Show cost estimate WITHOUT extraction (uses page count estimation)
-            from src.ui.streamlit_common import display_cost_estimates
-
-            # Show cost estimates WITHOUT running extraction
-            # display_cost_estimates handles extracted_texts=None by using page count heuristics
-            display_cost_estimates(
-                extracted_texts=None,  # Don't extract yet - show estimate first
-                provider=selected_provider,
-                runtime_model=selected_model,
-                show_all_models=False,  # Show specific model estimate only
-                uploaded_files=files_to_process,  # For Layer 1 cost calculation
-                doc_extractor=selected_doc_extractor  # For Layer 1 cost calculation
-            )
-
             # Tiktoken exact cost calculation will run automatically during processing
 
             if st.button("Process Files", type="primary", use_container_width=True):
