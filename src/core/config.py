@@ -57,7 +57,7 @@ class DoclingConfig:
     """Configuration for Docling document processing"""
 
     # OCR and processing options
-    do_ocr: bool = field(default_factory=lambda: env_bool("DOCLING_DO_OCR", True))
+    do_ocr: bool = field(default_factory=lambda: env_bool("DOCLING_DO_OCR", False))
     auto_ocr_detection: bool = field(default_factory=lambda: env_bool("DOCLING_AUTO_OCR_DETECTION", True))
     ocr_engine: Literal["tesseract", "easyocr", "ocrmac", "rapidocr"] = field(
         default_factory=lambda: env_str("DOCLING_OCR_ENGINE", "tesseract")

@@ -532,7 +532,7 @@ USE_ENHANCED_PROMPT=true uv run python scripts/test_openrouter.py
 | `ANTHROPIC_MODEL` | `claude-3-haiku-20240307` | Claude 3.5 or Claude 3 models |
 | `DEEPSEEK_API_KEY` | _(required for DeepSeek)_ | Direct DeepSeek API access |
 | `DEEPSEEK_MODEL` | `deepseek-chat` | DeepSeek-Chat model |
-| `DOCLING_DO_OCR` | `true` | Enable/disable OCR |
+| `DOCLING_DO_OCR` | `false` | Enable/disable OCR (auto-detects scanned PDFs for 16x speedup on digital docs) |
 | `DOCLING_TABLE_MODE` | `FAST` | `FAST` or `ACCURATE` |
 | `DOCLING_ACCELERATOR_DEVICE` | `cpu` | `cpu`, `cuda`, or `mps` |
 
