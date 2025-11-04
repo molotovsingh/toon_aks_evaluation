@@ -8,6 +8,7 @@ import streamlit as st
 import os
 import logging
 import time
+import shutil
 from pathlib import Path
 
 # Load environment variables FIRST (before imports that need it)
@@ -1173,6 +1174,10 @@ def main():
             if use_tiktoken:
                 if st.button("📊 Calculate Exact Costs", type="secondary", use_container_width=True, key="exact_calc_btn"):
                     with st.spinner("📄 Extracting documents for exact token counting..."):
+                        import tempfile
+                        temp_tiktoken_path = tempfile.mkdtemp()
+                        file_handler = FileHandler()
+
                         try:
                             # Stage 1: Extract documents using Docling (free)
                             stage1_start = time.perf_counter()
@@ -1201,17 +1206,17 @@ def main():
                                 file_ext = ".unknown"
 
                                 try:
-                                    # Get file metadata for better error reporting
-                                    file_size_mb = len(file_obj.getbuffer()) / (1024 * 1024) if hasattr(file_obj, 'getbuffer') else 0
-                                    file_ext = Path(file_obj.name).suffix.lower()
+                                    # Save uploaded file to disk (Docling requires file paths, not file objects)
+                                    file_path = file_handler.save_uploaded_file(file_obj, temp_tiktoken_path)
 
-                                    # Reset file pointer to beginning after reading buffer
-                                    if hasattr(file_obj, 'seek'):
-                                        file_obj.seek(0)
+                                    # Get file metadata for better error reporting
+                                    file_size_mb = Path(file_path).stat().st_size / (1024 * 1024)
+                                    file_ext = Path(file_path).suffix.lower()
 
                                     logger.info(f"📄 Extracting {file_obj.name} ({file_size_mb:.2f} MB, {file_ext})")
 
-                                    doc_result = pipeline.document_extractor.extract(file_obj)
+                                    # Extract from file path (not file object) - Docling expects Path
+                                    doc_result = pipeline.document_extractor.extract(file_path)
                                     if doc_result and doc_result.plain_text:
                                         char_count = len(doc_result.plain_text)
                                         extracted_texts.append(doc_result.plain_text)
@@ -1365,6 +1370,15 @@ def main():
                                 st.write(f"**Error Type:** {type(e).__name__}")
                                 st.write(f"**Error Message:** {str(e)}")
                                 st.write("Check application logs for full stack trace.")
+
+                        finally:
+                            # Clean up temporary directory
+                            try:
+                                if temp_tiktoken_path and Path(temp_tiktoken_path).exists():
+                                    shutil.rmtree(temp_tiktoken_path, ignore_errors=True)
+                                    logger.info(f"🧹 Cleaned up temporary directory: {temp_tiktoken_path}")
+                            except Exception as cleanup_error:
+                                logger.warning(f"⚠️ Failed to clean up temp directory: {cleanup_error}")
 
             if st.button("Process Files", type="primary", use_container_width=True):
                 # Enhanced status container with context
