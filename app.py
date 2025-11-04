@@ -1196,15 +1196,18 @@ def main():
                             extraction_stats = []  # Track per-file stats for logging
 
                             for file_obj in files_to_process:
-                                # Get file metadata for better error reporting (outside try for use in except)
-                                file_size_mb = len(file_obj.getbuffer()) / (1024 * 1024) if hasattr(file_obj, 'getbuffer') else 0
-                                file_ext = Path(file_obj.name).suffix.lower()
-
-                                # Reset file pointer to beginning after reading buffer
-                                if hasattr(file_obj, 'seek'):
-                                    file_obj.seek(0)
+                                # Initialize with safe defaults (in case metadata extraction fails)
+                                file_size_mb = 0
+                                file_ext = ".unknown"
 
                                 try:
+                                    # Get file metadata for better error reporting
+                                    file_size_mb = len(file_obj.getbuffer()) / (1024 * 1024) if hasattr(file_obj, 'getbuffer') else 0
+                                    file_ext = Path(file_obj.name).suffix.lower()
+
+                                    # Reset file pointer to beginning after reading buffer
+                                    if hasattr(file_obj, 'seek'):
+                                        file_obj.seek(0)
 
                                     logger.info(f"📄 Extracting {file_obj.name} ({file_size_mb:.2f} MB, {file_ext})")
 
