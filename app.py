@@ -7,6 +7,8 @@ Unified Five-Column Table: Docling + LangExtract + Shared Utilities
 import streamlit as st
 import os
 import logging
+import time
+from pathlib import Path
 
 # Load environment variables FIRST (before imports that need it)
 from dotenv import load_dotenv
@@ -1175,28 +1177,96 @@ def main():
                     with st.spinner("📄 Extracting documents for exact token counting..."):
                         try:
                             # Stage 1: Extract documents using Docling (free)
+                            stage1_start = time.perf_counter()
+
                             pipeline = LegalEventsPipeline(
                                 event_extractor=selected_provider,
                                 runtime_model=selected_model if selected_model else None,
                                 doc_extractor=selected_doc_extractor
                             )
 
+                            # Log configuration for debugging
+                            ocr_enabled = os.getenv('DOCLING_DO_OCR', 'false').lower() == 'true'
+                            logger.info(
+                                f"🔬 Tiktoken exact cost calculation started: "
+                                f"doc_extractor={selected_doc_extractor}, "
+                                f"files={len(files_to_process)}, "
+                                f"OCR={'enabled' if ocr_enabled else 'disabled'}"
+                            )
+
                             extracted_texts = []
+                            extraction_stats = []  # Track per-file stats for logging
+
                             for file_obj in files_to_process:
                                 try:
+                                    # Get file metadata for better error reporting
+                                    file_size_mb = len(file_obj.getbuffer()) / (1024 * 1024) if hasattr(file_obj, 'getbuffer') else 0
+                                    file_ext = Path(file_obj.name).suffix.lower()
+
+                                    logger.info(f"📄 Extracting {file_obj.name} ({file_size_mb:.2f} MB, {file_ext})")
+
                                     doc_result = pipeline.document_extractor.extract(file_obj)
                                     if doc_result and doc_result.plain_text:
+                                        char_count = len(doc_result.plain_text)
                                         extracted_texts.append(doc_result.plain_text)
+                                        extraction_stats.append({
+                                            'name': file_obj.name,
+                                            'chars': char_count,
+                                            'status': 'success'
+                                        })
+                                        logger.info(f"✅ Extracted {char_count:,} chars from {file_obj.name}")
+                                    else:
+                                        # Empty extraction (not an error, but noteworthy)
+                                        logger.warning(
+                                            f"⚠️ No text extracted from {file_obj.name} "
+                                            f"({file_size_mb:.2f} MB, {file_ext}, extractor: {selected_doc_extractor})"
+                                        )
+                                        extraction_stats.append({
+                                            'name': file_obj.name,
+                                            'chars': 0,
+                                            'status': 'empty'
+                                        })
+
                                 except Exception as e:
-                                    logger.warning(f"Failed to extract {file_obj.name}: {e}")
+                                    logger.error(
+                                        f"❌ Extraction failed: {file_obj.name} "
+                                        f"({file_size_mb:.2f} MB, {file_ext}, extractor: {selected_doc_extractor}) "
+                                        f"Error: {str(e)}"
+                                    )
+                                    extraction_stats.append({
+                                        'name': file_obj.name,
+                                        'chars': 0,
+                                        'status': 'error',
+                                        'error': str(e)
+                                    })
+
+                            # Log Stage 1 completion
+                            stage1_time = time.perf_counter() - stage1_start
+                            successful_extractions = sum(1 for s in extraction_stats if s['status'] == 'success')
+                            total_chars = sum(s['chars'] for s in extraction_stats)
+                            logger.info(
+                                f"⏱️  Stage 1 complete: {successful_extractions}/{len(files_to_process)} files extracted "
+                                f"in {stage1_time:.2f}s ({total_chars:,} chars total)"
+                            )
 
                             if extracted_texts:
                                 # Stage 2: Calculate exact costs using tiktoken
+                                stage2_start = time.perf_counter()
+
                                 with st.spinner("🔬 Counting tokens with tiktoken..."):
                                     cost_table = estimate_all_models_with_tiktoken(
                                         extracted_texts=extracted_texts,
                                         output_ratio=0.10  # 10% output token ratio
                                     )
+
+                                # Log Stage 2 completion
+                                stage2_time = time.perf_counter() - stage2_start
+                                total_time = stage1_time + stage2_time
+                                logger.info(
+                                    f"⏱️  Stage 2 complete: {len(cost_table or [])} models calculated "
+                                    f"in {stage2_time:.2f}s | Total: {total_time:.2f}s "
+                                    f"(extraction: {stage1_time:.2f}s, tiktoken: {stage2_time:.2f}s)"
+                                )
 
                                 # Stage 3: Display exact cost table
                                 if cost_table:
@@ -1224,18 +1294,71 @@ def main():
                                         }
                                     )
 
+                                    # Log cost calculation summary
+                                    total_input_tokens = sum(model.get('input_tokens', 0) for model in cost_table)
+                                    total_output_tokens = sum(model.get('output_tokens', 0) for model in cost_table)
+                                    costs = [model.get('total_cost', 0) for model in cost_table]
+                                    min_cost = min(costs) if costs else 0
+                                    max_cost = max(costs) if costs else 0
+                                    cheapest_model = next((m['model_id'] for m in cost_table if m.get('total_cost') == min_cost), 'N/A')
+                                    most_expensive = next((m['model_id'] for m in cost_table if m.get('total_cost') == max_cost), 'N/A')
+
+                                    logger.info(
+                                        f"💰 Cost calculation summary: "
+                                        f"{len(cost_table)} models, "
+                                        f"tokens: {total_input_tokens:,} input / {total_output_tokens:,} output, "
+                                        f"cost range: ${min_cost:.6f} ({cheapest_model}) "
+                                        f"to ${max_cost:.6f} ({most_expensive})"
+                                    )
+
                                     st.info(
                                         "💡 **Exact Cost Calculation**: These costs are based on actual document token counts "
                                         "using OpenAI's official tiktoken library. Accuracy: ±2% vs actual API billing."
                                     )
                                 else:
+                                    logger.error(
+                                        f"❌ Tiktoken cost calculation returned empty results "
+                                        f"(texts={len(extracted_texts)}, table_size={len(cost_table or [])})"
+                                    )
                                     st.error("Failed to calculate exact costs. Please try again.")
+
+                                    with st.expander("🔍 Debug Details"):
+                                        st.write(f"**Extracted Texts:** {len(extracted_texts)}")
+                                        st.write(f"**Models Attempted:** {len(cost_table or [])}")
+                                        st.write("Check application logs for model-specific errors.")
                             else:
+                                # Enhanced empty results error with debug information
+                                error_msg = (
+                                    f"❌ No text extracted from ANY files "
+                                    f"({len(files_to_process)} files, extractor: {selected_doc_extractor}). "
+                                    f"Possible causes: corrupted files, unsupported formats, or OCR failure."
+                                )
+                                logger.error(error_msg)
                                 st.error("No text could be extracted from the uploaded files.")
 
+                                # Show detailed breakdown in expander
+                                with st.expander("🔍 Debug Details"):
+                                    st.write(f"**Document Extractor:** {selected_doc_extractor}")
+                                    st.write(f"**Files Attempted:** {len(files_to_process)}")
+                                    st.write(f"**OCR Enabled:** {ocr_enabled}")
+                                    st.write("**Per-File Results:**")
+                                    for idx, stats in enumerate(extraction_stats, 1):
+                                        status_emoji = "✅" if stats['status'] == 'success' else "❌" if stats['status'] == 'error' else "⚠️"
+                                        if stats['status'] == 'success':
+                                            st.write(f"  {status_emoji} {stats['name']}: {stats['chars']:,} chars")
+                                        elif stats['status'] == 'empty':
+                                            st.write(f"  {status_emoji} {stats['name']}: No text (possibly blank or image-based)")
+                                        else:
+                                            st.write(f"  {status_emoji} {stats['name']}: {stats.get('error', 'Unknown error')}")
+
                         except Exception as e:
-                            logger.error(f"Error calculating exact costs: {e}")
-                            st.error(f"Failed to calculate exact costs: {str(e)}")
+                            logger.error(f"❌ Exact cost calculation failed with exception: {str(e)}", exc_info=True)
+                            st.error("An unexpected error occurred during cost calculation. Check application logs for details.")
+
+                            with st.expander("🔍 Error Details"):
+                                st.write(f"**Error Type:** {type(e).__name__}")
+                                st.write(f"**Error Message:** {str(e)}")
+                                st.write("Check application logs for full stack trace.")
 
             if st.button("Process Files", type="primary", use_container_width=True):
                 # Enhanced status container with context
