@@ -1116,7 +1116,6 @@ def main():
         # Quick sample document button
         st.markdown('<div class="section-header">⚡ Quick Test</div>', unsafe_allow_html=True)
         if st.button("📄 Try Sample Document", use_container_width=True, help="Load the Famas arbitration PDF for testing"):
-            from pathlib import Path
             sample_path = Path("sample_pdf/famas_dispute/Transaction_Fee_Invoice.pdf")
 
             if sample_path.exists():
@@ -1133,7 +1132,6 @@ def main():
 
         # Handle sample document if requested
         if st.session_state.get('use_sample', False) and not uploaded_files:
-            from pathlib import Path
             sample_path = Path("sample_pdf/famas_dispute/Transaction_Fee_Invoice.pdf")
 
             if sample_path.exists():
@@ -1404,7 +1402,6 @@ def main():
                         # Import classification factory
                         from src.core.classification_factory import create_classifier
                         import tempfile
-                        from pathlib import Path
 
                         # Create classifier adapter
                         classifier = create_classifier(classification_model, classification_prompt)
@@ -1553,7 +1550,6 @@ def main():
                         if 'metadata' in legal_events_df.attrs:
                             try:
                                 import json
-                                from pathlib import Path
 
                                 metadata_dict = legal_events_df.attrs['metadata']
                                 output_dir = Path("output")
