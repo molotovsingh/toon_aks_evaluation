@@ -1175,7 +1175,7 @@ def main():
                 if st.button("📊 Calculate Exact Costs", type="secondary", use_container_width=True, key="exact_calc_btn"):
                     with st.spinner("📄 Extracting documents for exact token counting..."):
                         import tempfile
-                        temp_tiktoken_path = tempfile.mkdtemp()
+                        temp_tiktoken_path = Path(tempfile.mkdtemp())
                         file_handler = FileHandler()
 
                         try:
