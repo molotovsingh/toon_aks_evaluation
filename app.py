@@ -1200,6 +1200,10 @@ def main():
                                 file_size_mb = len(file_obj.getbuffer()) / (1024 * 1024) if hasattr(file_obj, 'getbuffer') else 0
                                 file_ext = Path(file_obj.name).suffix.lower()
 
+                                # Reset file pointer to beginning after reading buffer
+                                if hasattr(file_obj, 'seek'):
+                                    file_obj.seek(0)
+
                                 try:
 
                                     logger.info(f"📄 Extracting {file_obj.name} ({file_size_mb:.2f} MB, {file_ext})")
