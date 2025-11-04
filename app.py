@@ -1160,21 +1160,145 @@ def main():
                 doc_extractor=selected_doc_extractor  # For Layer 1 cost calculation
             )
 
-            # Optional: Calculate exact costs using tiktoken
-            st.markdown("---")
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                use_tiktoken = st.checkbox(
-                    "🔬 Calculate exact token counts (requires document extraction)",
-                    help="Extract documents with Docling first, then use OpenAI's tiktoken for precise token counting. "
-                         "More accurate (±2% variance) but requires ~3-5 seconds for extraction.",
-                    key="tiktoken_exact_calc"
+            # Tiktoken exact cost calculation will run automatically during processing
+
+            if st.button("Process Files", type="primary", use_container_width=True):
+                # Enhanced status container with context
+                status_container = st.empty()
+
+                # Get provider display name
+                provider_names = {
+                    'langextract': 'LangExtract (Google Gemini)',
+                    'openrouter': 'OpenRouter',
+                    'opencode_zen': 'OpenCode Zen',
+                    'openai': 'OpenAI',
+                    'anthropic': 'Anthropic',
+                    'deepseek': 'DeepSeek'
+                }
+                provider_display = provider_names.get(
+                    selected_provider,
+                    selected_provider
                 )
 
-            if use_tiktoken:
-                if st.button("📊 Calculate Exact Costs", type="secondary", use_container_width=True, key="exact_calc_btn"):
-                    with st.spinner("📄 Extracting documents for exact token counting..."):
+                # Add model name to display if OpenRouter
+                if selected_provider == 'openrouter' and selected_model:
+                    # Extract friendly model name
+                    model_parts = selected_model.split('/')
+                    model_short = model_parts[-1] if len(model_parts) > 1 else selected_model
+                    provider_display = f"{provider_display} ({model_short})"
+
+                # Calculate expected time based on file sizes
+                file_handler = FileHandler()
+                total_size = sum(file_handler.get_file_info(f)['size_mb'] for f in files_to_process)
+                file_count = len(files_to_process)
+
+                # === LAYER 1.5: CLASSIFICATION (if enabled) ===
+                # Run classification on ALL documents, store as metadata for 6th column
+                classification_lookup = {}  # {filename: document_type}
+
+                if enable_classification and classification_model:
+                    # Show classification status
+                    with status_container:
+                        st.info(f"🏷️ **Classifying {file_count} document{'s' if file_count > 1 else ''}**...")
+
+                    try:
+                        # Import classification factory
+                        from src.core.classification_factory import create_classifier
                         import tempfile
+
+                        # Create classifier adapter
+                        classifier = create_classifier(classification_model, classification_prompt)
+
+                        # Get pipeline for document extraction (Layer 1)
+                        pipeline = get_pipeline(
+                            provider=selected_provider,
+                            runtime_model=selected_model,
+                            doc_extractor=selected_doc_extractor
+                        )
+
+                        if pipeline is None:
+                            st.error("❌ Failed to initialize pipeline for classification")
+                            status_container.empty()
+                        else:
+                            # Extract and classify all documents
+                            classifications = []
+                            with tempfile.TemporaryDirectory() as temp_dir:
+                                temp_path = Path(temp_dir)
+
+                                with st.spinner(f"📊 Extracting and classifying {file_count} document{'s' if file_count > 1 else ''}..."):
+                                    for idx, file in enumerate(files_to_process, 1):
+                                        try:
+                                            # Reset file position
+                                            if hasattr(file, 'seek'):
+                                                file.seek(0)
+
+                                            # Save and extract (uses cache)
+                                            file_path = file_handler.save_uploaded_file(file, temp_path)
+                                            doc_result = pipeline.document_extractor.extract(file_path)
+
+                                            if not doc_result or not doc_result.plain_text.strip():
+                                                st.warning(f"⚠️ No text extracted from {file.name} - skipping classification")
+                                                classification_lookup[file.name] = "Unknown"
+                                                continue
+
+                                            # Classify document
+                                            classification_result = classifier.classify(
+                                                doc_result.plain_text,
+                                                document_title=file.name
+                                            )
+
+                                            # Store for 6th column
+                                            classification_lookup[file.name] = classification_result['primary']
+
+                                            classifications.append({
+                                                'filename': file.name,
+                                                'type': classification_result['primary'],
+                                                'confidence': classification_result.get('confidence', 0.0),
+                                                'all_labels': classification_result.get('classes', [])
+                                            })
+
+                                            logger.info(
+                                                f"✅ Classified {file.name}: {classification_result['primary']} "
+                                                f"(confidence={classification_result.get('confidence', 0):.2f})"
+                                            )
+
+                                        except Exception as e:
+                                            logger.error(f"❌ Classification failed for {file.name}: {e}")
+                                            st.warning(f"⚠️ Classification failed for {file.name}: {str(e)}")
+                                            classification_lookup[file.name] = "Classification Failed"
+
+                            # Clear status
+                            status_container.empty()
+
+                            # Defensive logging: Check classification results
+                            if len(classification_lookup) == 0:
+                                logger.warning(
+                                    f"⚠️ Classification completed but no files were classified. "
+                                    f"Processed {file_count} files but classification_lookup is empty."
+                                )
+                            else:
+                                logger.info(
+                                    f"✅ Classification completed: {len(classification_lookup)} files classified "
+                                    f"out of {file_count} processed"
+                                )
+
+                            # Show classification results (collapsible to reduce clutter)
+                            if classifications:
+                                st.divider()
+                                with st.expander("📊 Classification Results", expanded=False):
+                                    show_classification_results(classifications)
+                                st.divider()
+
+                    except Exception as e:
+                        logger.error(f"❌ Classification layer failed: {e}")
+                        st.error(f"🚨 Classification failed: {str(e)}\n\nProceeding without classification...")
+
+                # === LAYER 1.7: TIKTOKEN EXACT COST CALCULATION ===
+                # Auto-calculate exact token costs using Docling extraction + OpenAI tiktoken
+                if files_to_process:
+                    import tempfile
+
+                    with st.spinner("📄 Calculating exact token costs..."):
                         temp_tiktoken_path = Path(tempfile.mkdtemp())
                         file_handler = FileHandler()
 
@@ -1326,12 +1450,13 @@ def main():
                                         "💡 **Exact Cost Calculation**: These costs are based on actual document token counts "
                                         "using OpenAI's official tiktoken library. Accuracy: ±2% vs actual API billing."
                                     )
+                                    st.divider()
                                 else:
                                     logger.error(
                                         f"❌ Tiktoken cost calculation returned empty results "
                                         f"(texts={len(extracted_texts)}, table_size={len(cost_table or [])})"
                                     )
-                                    st.error("Failed to calculate exact costs. Please try again.")
+                                    st.warning("⚠️ Failed to calculate exact costs. Proceeding with event extraction...")
 
                                     with st.expander("🔍 Debug Details"):
                                         st.write(f"**Extracted Texts:** {len(extracted_texts)}")
@@ -1340,12 +1465,12 @@ def main():
                             else:
                                 # Enhanced empty results error with debug information
                                 error_msg = (
-                                    f"❌ No text extracted from ANY files "
+                                    f"⚠️ No text extracted from ANY files "
                                     f"({len(files_to_process)} files, extractor: {selected_doc_extractor}). "
                                     f"Possible causes: corrupted files, unsupported formats, or OCR failure."
                                 )
-                                logger.error(error_msg)
-                                st.error("No text could be extracted from the uploaded files.")
+                                logger.warning(error_msg)
+                                st.warning("⚠️ " + error_msg.replace("⚠️ ", ""))
 
                                 # Show detailed breakdown in expander
                                 with st.expander("🔍 Debug Details"):
@@ -1363,8 +1488,8 @@ def main():
                                             st.write(f"  {status_emoji} {stats['name']}: {stats.get('error', 'Unknown error')}")
 
                         except Exception as e:
-                            logger.error(f"❌ Exact cost calculation failed with exception: {str(e)}", exc_info=True)
-                            st.error("An unexpected error occurred during cost calculation. Check application logs for details.")
+                            logger.error(f"❌ Tiktoken cost calculation failed: {str(e)}", exc_info=True)
+                            st.warning(f"⚠️ Cost calculation failed - proceeding with event extraction...")
 
                             with st.expander("🔍 Error Details"):
                                 st.write(f"**Error Type:** {type(e).__name__}")
@@ -1379,137 +1504,6 @@ def main():
                                     logger.info(f"🧹 Cleaned up temporary directory: {temp_tiktoken_path}")
                             except Exception as cleanup_error:
                                 logger.warning(f"⚠️ Failed to clean up temp directory: {cleanup_error}")
-
-            if st.button("Process Files", type="primary", use_container_width=True):
-                # Enhanced status container with context
-                status_container = st.empty()
-
-                # Get provider display name
-                provider_names = {
-                    'langextract': 'LangExtract (Google Gemini)',
-                    'openrouter': 'OpenRouter',
-                    'opencode_zen': 'OpenCode Zen',
-                    'openai': 'OpenAI',
-                    'anthropic': 'Anthropic',
-                    'deepseek': 'DeepSeek'
-                }
-                provider_display = provider_names.get(
-                    selected_provider,
-                    selected_provider
-                )
-
-                # Add model name to display if OpenRouter
-                if selected_provider == 'openrouter' and selected_model:
-                    # Extract friendly model name
-                    model_parts = selected_model.split('/')
-                    model_short = model_parts[-1] if len(model_parts) > 1 else selected_model
-                    provider_display = f"{provider_display} ({model_short})"
-
-                # Calculate expected time based on file sizes
-                file_handler = FileHandler()
-                total_size = sum(file_handler.get_file_info(f)['size_mb'] for f in files_to_process)
-                file_count = len(files_to_process)
-
-                # === LAYER 1.5: CLASSIFICATION (if enabled) ===
-                # Run classification on ALL documents, store as metadata for 6th column
-                classification_lookup = {}  # {filename: document_type}
-
-                if enable_classification and classification_model:
-                    # Show classification status
-                    with status_container:
-                        st.info(f"🏷️ **Classifying {file_count} document{'s' if file_count > 1 else ''}**...")
-
-                    try:
-                        # Import classification factory
-                        from src.core.classification_factory import create_classifier
-                        import tempfile
-
-                        # Create classifier adapter
-                        classifier = create_classifier(classification_model, classification_prompt)
-
-                        # Get pipeline for document extraction (Layer 1)
-                        pipeline = get_pipeline(
-                            provider=selected_provider,
-                            runtime_model=selected_model,
-                            doc_extractor=selected_doc_extractor
-                        )
-
-                        if pipeline is None:
-                            st.error("❌ Failed to initialize pipeline for classification")
-                            status_container.empty()
-                        else:
-                            # Extract and classify all documents
-                            classifications = []
-                            with tempfile.TemporaryDirectory() as temp_dir:
-                                temp_path = Path(temp_dir)
-
-                                with st.spinner(f"📊 Extracting and classifying {file_count} document{'s' if file_count > 1 else ''}..."):
-                                    for idx, file in enumerate(files_to_process, 1):
-                                        try:
-                                            # Reset file position
-                                            if hasattr(file, 'seek'):
-                                                file.seek(0)
-
-                                            # Save and extract (uses cache)
-                                            file_path = file_handler.save_uploaded_file(file, temp_path)
-                                            doc_result = pipeline.document_extractor.extract(file_path)
-
-                                            if not doc_result or not doc_result.plain_text.strip():
-                                                st.warning(f"⚠️ No text extracted from {file.name} - skipping classification")
-                                                classification_lookup[file.name] = "Unknown"
-                                                continue
-
-                                            # Classify document
-                                            classification_result = classifier.classify(
-                                                doc_result.plain_text,
-                                                document_title=file.name
-                                            )
-
-                                            # Store for 6th column
-                                            classification_lookup[file.name] = classification_result['primary']
-
-                                            classifications.append({
-                                                'filename': file.name,
-                                                'type': classification_result['primary'],
-                                                'confidence': classification_result.get('confidence', 0.0),
-                                                'all_labels': classification_result.get('classes', [])
-                                            })
-
-                                            logger.info(
-                                                f"✅ Classified {file.name}: {classification_result['primary']} "
-                                                f"(confidence={classification_result.get('confidence', 0):.2f})"
-                                            )
-
-                                        except Exception as e:
-                                            logger.error(f"❌ Classification failed for {file.name}: {e}")
-                                            st.warning(f"⚠️ Classification failed for {file.name}: {str(e)}")
-                                            classification_lookup[file.name] = "Classification Failed"
-
-                            # Clear status
-                            status_container.empty()
-
-                            # Defensive logging: Check classification results
-                            if len(classification_lookup) == 0:
-                                logger.warning(
-                                    f"⚠️ Classification completed but no files were classified. "
-                                    f"Processed {file_count} files but classification_lookup is empty."
-                                )
-                            else:
-                                logger.info(
-                                    f"✅ Classification completed: {len(classification_lookup)} files classified "
-                                    f"out of {file_count} processed"
-                                )
-
-                            # Show classification results (collapsible to reduce clutter)
-                            if classifications:
-                                st.divider()
-                                with st.expander("📊 Classification Results", expanded=False):
-                                    show_classification_results(classifications)
-                                st.divider()
-
-                    except Exception as e:
-                        logger.error(f"❌ Classification layer failed: {e}")
-                        st.error(f"🚨 Classification failed: {str(e)}\n\nProceeding without classification...")
 
                 # === LAYER 2: EVENT EXTRACTION ===
                 if files_to_process:
