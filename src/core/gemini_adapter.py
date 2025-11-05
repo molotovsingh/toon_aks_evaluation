@@ -105,8 +105,8 @@ class GeminiEventExtractor:
             events = self._parse_gemini_response(response_data, document_name)
 
             if not events:
-                logger.warning(f"⚠️ No events extracted from Gemini response for {document_name}")
-                return [self._create_fallback_record(document_name, "No legal events found in response")]
+                logger.info(f"ℹ️ No legal events in {document_name} (valid for administrative docs)")
+                return [self._create_empty_result_record(document_name)]
 
             logger.info(
                 f"✅ Extracted {len(events)} legal events from {document_name} via Gemini "
@@ -260,6 +260,29 @@ class GeminiEventExtractor:
             citation="No citation available (extraction failed)",
             document_reference=document_name,
             attributes={"fallback": True, "reason": reason}
+        )
+
+    def _create_empty_result_record(self, document_name: str) -> EventRecord:
+        """
+        Create record when document has no legal events (not an error)
+
+        Args:
+            document_name: Source document name
+
+        Returns:
+            EventRecord indicating no events found (valid for administrative documents)
+        """
+        return EventRecord(
+            number=1,
+            date=DEFAULT_NO_DATE,
+            event_particulars=f"Extraction complete: No dates relevant to the litigation detected in {document_name}. This is normal for administrative documents, invoices, or routine correspondence.",
+            citation="N/A",
+            document_reference=document_name,
+            attributes={
+                "fallback": False,
+                "empty_result": True,
+                "reason": "no_legal_events"
+            }
         )
 
     def is_available(self) -> bool:
