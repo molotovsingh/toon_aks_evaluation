@@ -64,7 +64,7 @@ class DocumentProcessor:
         ocr_options = None
         if config.do_ocr:
             if config.ocr_engine == "tesseract":
-                from docling.datamodel.pipeline_options import TesseractOcrOptions, EasyOcrOptions
+                from docling.datamodel.pipeline_options import TesseractOcrOptions, RapidOcrOptions
                 import os
                 from pathlib import Path
 
@@ -88,10 +88,10 @@ class DocumentProcessor:
                 else:
                     logger.warning("⚠️ TESSDATA_PREFIX not set")
 
-                # Automatic fallback to EasyOCR if Tesseract invalid
+                # Automatic fallback to RapidOCR if Tesseract invalid
                 if not tesseract_valid:
-                    logger.info("🔄 Automatically falling back to EasyOCR (more resilient, no configuration needed)")
-                    ocr_options = EasyOcrOptions()
+                    logger.info("🔄 Automatically falling back to RapidOCR (lightweight, no configuration needed)")
+                    ocr_options = RapidOcrOptions()
 
             elif config.ocr_engine == "ocrmac":
                 from docling.datamodel.pipeline_options import OcrMacOptions
@@ -101,10 +101,10 @@ class DocumentProcessor:
                 from docling.datamodel.pipeline_options import RapidOcrOptions
                 ocr_options = RapidOcrOptions()
                 logger.info("✅ Using RapidOCR (lightweight)")
-            else:  # easyocr (explicit fallback)
-                from docling.datamodel.pipeline_options import EasyOcrOptions
-                ocr_options = EasyOcrOptions()
-                logger.info("✅ Using EasyOCR (PyTorch-based)")
+            else:  # easyocr or unknown engine - fallback to rapidocr
+                from docling.datamodel.pipeline_options import RapidOcrOptions
+                ocr_options = RapidOcrOptions()
+                logger.info("✅ Using RapidOCR (lightweight fallback)")
 
         # Build format options for each supported document type with appropriate backends
         format_options = {}
