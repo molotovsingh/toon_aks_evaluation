@@ -227,10 +227,10 @@ class DocumentProcessor:
             if ocr_options is not None:
                 image_kwargs["ocr_options"] = ocr_options
             else:
-                # If no OCR configured, use EasyOCR as fallback for images
-                from docling.datamodel.pipeline_options import EasyOcrOptions
-                image_kwargs["ocr_options"] = EasyOcrOptions()
-                logger.info("✅ Using fallback EasyOCR for image processing")
+                # If no OCR configured, use RapidOCR as fallback for images
+                from docling.datamodel.pipeline_options import RapidOcrOptions
+                image_kwargs["ocr_options"] = RapidOcrOptions()
+                logger.info("✅ Using fallback RapidOCR for image processing")
 
             image_pipeline_options = PdfPipelineOptions(**image_kwargs)
             image_backend = DoclingParseV4DocumentBackend
