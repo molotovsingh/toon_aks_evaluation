@@ -1,0 +1,30 @@
+{
+  "name": "docling_langextract_testing",
+  "version": "1.0.0",
+  "description": "**Testing docling + langextract combination for paralegal application**",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/molotovsingh/firstcut_testing_libs.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/molotovsingh/firstcut_testing_libs/issues"
+  },
+  "homepage": "https://github.com/molotovsingh/firstcut_testing_libs#readme",
+  "dependencies": {
+    "@toon-format/toon": "^0.8.0",
+    "gpt-tokenizer": "^3.4.0"
+  }
+}
