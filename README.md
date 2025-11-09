@@ -1,1217 +1,212 @@
-# ⚖️ Paralegal Date Extraction Test
+# TOON vs JSON Cost Analysis
 
-**Testing docling + langextract combination for paralegal application**
+A practical tool to measure the real-world cost savings of using TOON (Token-Oriented Object Notation) instead of JSON for LLM data input.
 
-## 🚨 SECURITY NOTICE
+## 🎯 What This Demonstrates
 
-**⚠️ IMPORTANT: API Key Security**
+This analysis shows the **actual token and dollar cost differences** between JSON and TOON formats when sending data to Large Language Models. The results confirm TOON's claims of 30-60% token reduction with real, measurable cost savings.
 
-This project requires a Google API key for LangExtract functionality. **NEVER commit API keys to version control.**
+## 📊 Key Results Summary
 
-### Security Checklist:
-- [ ] `.env` file contains placeholder, not real API key
-- [ ] Real API key stored securely (environment variables, secret manager)
-- [ ] `.env` file is properly excluded in `.gitignore`
-- [ ] No API keys in commit history
+From our comprehensive analysis across 5 different data types:
 
-### Safe Setup:
-1. Copy `.env.example` to `.env`
-2. Replace `your_google_api_key_here` with actual key
-3. Verify `.env` is in `.gitignore` before committing
+| Dataset | Token Savings | Cost Savings (GPT-4) | Best Use Case |
+|---------|---------------|---------------------|---------------|
+| **Employee Records** | 63.1% | $0.11 per query | Perfect tabular data |
+| **Analytics Data** | 61.4% | $0.08 per query | Time-series metrics |
+| **E-commerce Orders** | 38.2% | $0.10 per query | Nested structures |
+| **Mixed Data** | 22.4% | $0.002 per query | Semi-uniform arrays |
+| **Small Datasets** | 21.0% | $0.003 per query | Simple metadata |
 
-## 🎯 Purpose
-
-**Legal Events Extraction:** Documents In → Five-Column Legal Events Table Out
-
-This is a **proof-of-concept** to evaluate document parsing and AI-based legal event extraction for paralegal applications. The system extracts structured legal events with dates, event particulars, citations, and document references.
-
-## 🧪 Test Scope
-
-- **Core Pipeline:** [Docling](https://github.com/DS4SD/docling) for document parsing + Multiple AI providers for event extraction
-- **Business Use Case:** Legal event extraction from court documents, contracts, correspondence, and legal filings
-- **Goal:** Test parser + extractor combinations to identify optimal configurations for quality, cost, and speed
-- **Provider Flexibility:** Supports LangExtract (Gemini), OpenRouter (11+ tested models), and OpenCode Zen with in-app provider switching
+**Total Savings: 50.1% tokens across all datasets**
 
 ## 🚀 Quick Start
 
-1. **Install UV** (if not already installed):
-   ```bash
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-
-2. **Enter the project directory**:
-   ```bash
-   cd docling_langextract_testing
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   uv sync
-   ```
-
-4. **Choose your interface**:
-
-   **Complete Suite** (Flask Web UI + FastAPI Analytics):
-   ```bash
-   python run_both.py
-   ```
-   - Flask Web UI: http://localhost:5001 (upload & process documents)
-   - FastAPI Analytics: http://localhost:8000 (query stored results)
-   - FastAPI Docs: http://localhost:8000/docs
-
-   **Streamlit Web UI Only** (Legacy interface):
-   ```bash
-   uv run streamlit run app.py
-   ```
-
-5. **Open your browser** to the appropriate URL above
-
-## 🔄 Provider Selection
-
-This system now supports **multiple event extraction providers** with two selection methods:
-
-### 1. **In-App UI Selection** (Recommended)
-
-The Streamlit application (`app.py`) includes a **provider selector** in the Processing panel that lets you switch between providers without restarting:
-
-- **OpenRouter** (Unified API) - ⭐ **Recommended Default** - Best quality/cost/speed balance
-- **Anthropic** (Claude 3 Haiku) - **Speed/Cost Champion** - 10x cheaper, 4x faster
-- **OpenAI** (GPT-4o/4-mini) - **Quality Champion** - Most detailed extraction
-- **LangExtract** (Google Gemini) - **Completeness Champion** - Captures all details
-- **DeepSeek** (Direct API) - **Research Champion** - Advanced reasoning model
-- **OpenCode Zen** (Model Router)
-
-**📊 Provider Comparison** (based on 2025-10-03 testing):
-
-**For Digital PDFs** (clean text):
-- **OpenRouter**: 8/10 quality, ~$0.015/doc, ~14s ⭐ **Best Overall**
-- **Anthropic**: 7/10 quality, $0.003/doc, 4.4s → High-volume processing
-- **OpenAI**: 8/10 quality, $0.03/doc, 18s → High-stakes legal work
-- **LangExtract**: 6/10 quality, ~$0.01/doc, 36s → Comprehensive analysis
-
-**For Scanned PDFs** (requires OCR):
-- **Anthropic**: 10/10 quality, $0.0005/doc, 2.05s ⭐ **OCR Champion** (4x cheaper, 3x faster)
-- **OpenAI**: 10/10 quality, $0.0039/doc, 5.96s → Maximum detail
-- **OpenRouter**: 10/10 quality, ~$0.008/doc, 8.43s → Consistent quality
-- **LangExtract**: 7/10 quality, ~$0.002/doc, 3.82s → Comprehensive but noisy
-
-**Key Finding**: ✅ **OCR does NOT degrade extraction quality** - Docling OCR is production-ready. Anthropic becomes the top choice for scanned documents due to speed/cost advantages when OCR is the bottleneck.
-
-**Phase 4 Benchmark Results** (2025-10-04, 6-provider comparison with 3-judge panel):
-
-| Provider | Overall Quality | Completeness | Accuracy | Citation Quality | Win Rate |
-|----------|----------------|--------------|----------|------------------|----------|
-| **OpenRouter** | 6.25/10 ⭐ | 6.75/10 | 8.5/10 | 5.0/10 | 100% (2/2) |
-| **OpenAI** | 6.25/10 | 6.75/10 | 8.5/10 | 5.0/10 | Tied 2nd |
-| **Anthropic** | 4.0/10 | 5.0/10 | 5.5/10 | 2.5/10 | 0% |
-| **LangExtract** | 2.75/10 | 5.5/10 | 6.0/10 | **0.0/10** ❌ | 0% |
-| **DeepSeek** | N/A | - | - | - | No API key |
-| **OpenCode Zen** | 0.0/10 | 0.0/10 | 0.0/10 | 0.0/10 | Extraction failures |
-
-**Key Finding**: **Citation quality is paramount for legal work** - LangExtract extracted 4-5 events but scored lowest due to missing citations. 1 well-cited event beats 5 events without citations.
-
-See detailed evaluations:
-- Phase 4 (6-provider benchmark): `config/benchmarks/results/phase4_judge_results_20251004_183300.json`
-- Phase 2 (manual eval): `docs/reports/phase2-comparison-2025-10-04.md`
-- Digital PDFs: `docs/benchmarks/2025-10-03-manual-comparison.md`
-- Scanned PDFs: `docs/benchmarks/2025-10-03-ocr-comparison.md`
-
-**⚠️ Important**: Each provider requires **provider-specific** API keys. The pipeline validates only the key needed for your selected provider:
-
-**Required API Keys (Provider-Specific):**
-- **OpenRouter**: `OPENROUTER_API_KEY` (recommended default)
-- **Anthropic**: `ANTHROPIC_API_KEY` (for speed/cost optimization)
-- **OpenAI**: `OPENAI_API_KEY` (for maximum quality)
-- **LangExtract**: `GEMINI_API_KEY` or `GOOGLE_API_KEY` (either one)
-- **DeepSeek**: `DEEPSEEK_API_KEY` (for advanced reasoning)
-- **OpenCode Zen**: `OPENCODEZEN_API_KEY` (alternative model router)
-
-**How Validation Works:**
-- Selecting LangExtract → Validates `GEMINI_API_KEY` only
-- Selecting OpenRouter → Validates `OPENROUTER_API_KEY` only (no Gemini key needed)
-- Selecting OpenCode Zen → Validates `OPENCODEZEN_API_KEY` only (no Gemini key needed)
-
-If you switch providers, you only need the API key for that specific provider. The app will display a clear error message if the required key is missing.
-
-The selector automatically initializes the pipeline with your chosen provider and displays required credentials in the tooltip.
-
-### 2. **Environment Variable Override**
-
-You can also set a default provider via the `EVENT_EXTRACTOR` environment variable:
-
+### 1. Quick Demo (30 seconds)
 ```bash
-# Use LangExtract (default)
-export EVENT_EXTRACTOR=langextract
-export GEMINI_API_KEY=your_google_api_key_here
-
-# Use OpenRouter
-export EVENT_EXTRACTOR=openrouter
-export OPENROUTER_API_KEY=your_openrouter_api_key_here
-
-# Use OpenCode Zen
-export EVENT_EXTRACTOR=opencode_zen
-export OPENCODEZEN_API_KEY=your_opencode_zen_api_key_here
-
-# Use OpenAI
-export EVENT_EXTRACTOR=openai
-export OPENAI_API_KEY=your_openai_api_key_here
-
-# Use Anthropic
-export EVENT_EXTRACTOR=anthropic
-export ANTHROPIC_API_KEY=your_anthropic_api_key_here
-
-# Use DeepSeek
-export EVENT_EXTRACTOR=deepseek
-export DEEPSEEK_API_KEY=your_deepseek_api_key_here
+node toon-quick-demo.js
 ```
+Shows a simple 3-employee example with immediate cost comparison.
 
-**Note**: The Streamlit UI selector takes precedence over the environment variable during interactive sessions.
-
-### 3. **Ground Truth Model Selection** (Premium Models)
-
-The UI now supports **runtime model selection** within each provider for creating **ground truth extraction datasets**. Ground truth datasets serve as reference benchmarks for validating cheaper production models.
-
-#### Available Ground Truth Models
-
-**Anthropic (Direct API):**
-- **Claude Sonnet 4.5** (Tier 1) - `claude-sonnet-4-5`
-  - $3/M input • $15/M output • 200K context
-  - "Best coding model in the world" (Sep 2025), recommended for ground truth
-  - Best balance of quality, cost, and speed
-- **Claude Opus 4** (Tier 3) - `claude-opus-4`
-  - $15/M input • $75/M output • 200K context
-  - Highest quality model (May 2025), best for complex reasoning
-  - Use for quality validation of Tier 1 outputs
-
-**OpenAI (Direct API):**
-- **GPT-5** (Tier 2) - `gpt-5`
-  - $TBD • 128K context (Aug 2025)
-  - Latest flagship model, best for coding and reasoning
-  - Pricing pending official announcement
-
-**LangExtract (Google Gemini):**
-- **Gemini 2.5 Pro** (Tier 2) - `gemini-2.5-pro`
-  - $TBD • 2M context (Jun 2025)
-  - Most intelligent AI model from Google
-  - Ideal for long documents (50+ pages) due to 2M context window
-
-#### How to Use Ground Truth Models
-
-1. **Run the Streamlit app**: `uv run streamlit run app.py`
-2. **Select a provider** (Anthropic, OpenAI, or LangExtract)
-3. **Choose a ground truth model** from the dropdown selector
-4. **Process documents** to create reference extraction dataset
-5. **Export results** (CSV/JSON/XLSX) for comparison with production model outputs
-
-#### Tier System
-
-- **Tier 1 (Recommended)**: Claude Sonnet 4.5 - best balance for most use cases
-- **Tier 2 (Alternative)**: GPT-5, Gemini 2.5 Pro - pending pricing or specialized use (long docs)
-- **Tier 3 (Validation)**: Claude Opus 4 - highest quality, use sparingly for validation
-
-#### Cost Comparison
-
-| Model Type | Cost per 15-page doc | Use Case |
-|------------|---------------------|----------|
-| **Production Models** | $0.001-0.005 | Daily processing (GPT-4o-mini, Claude Haiku, Gemini 2.0 Flash) |
-| **Ground Truth Models** | $0.02-0.10 | Reference datasets (5-20x more expensive) |
-
-**Recommendation**: Use ground truth models sparingly to create reference datasets, then test production models against those references. Ground truth extractions serve as quality benchmarks for validating cheaper models.
-
-#### Model Selection Architecture
-
-The system supports **runtime model override** for all providers:
-- **UI Selection**: Model dropdown in provider section (takes precedence)
-- **Environment Variable**: Set `OPENAI_MODEL`, `ANTHROPIC_MODEL`, or `GEMINI_MODEL_ID` for defaults
-- **Pipeline Integration**: Model selection passed to `process_documents_with_spinner(runtime_model=...)`
-
-See `.env.example` for detailed model configuration examples.
-
-## 📊 What Gets Tested
-
-### Core Pipeline:
-1. **📄 Docling** - Extracts text from legal documents (PDF, DOCX, TXT, PPTX, HTML, EML)
-2. **🌍 Langextract** - Detects document language
-3. **📅 Date Extraction** - Finds and normalizes dates (the key business value)
-
-### Test Metrics:
-- **Docling Success Rate** by file type
-- **Date Extraction Results** (number of dates found)
-- **Pipeline Success** (successful text extraction + date extraction)
-- **Language Detection** accuracy
-
-## 📧 Email File Support (.EML)
-
-The pipeline supports **native .eml email file parsing** using Python's standard library (no additional dependencies). Email files are processed through a specialized parser that extracts clean, readable text suitable for legal event extraction.
-
-### What Gets Extracted
-
-- **Email Headers**: Subject, From, To, Cc, Date, Message-ID (stored in `metadata`)
-- **Body Text**: Plain text content with automatic decoding of quoted-printable and base64 encodings
-- **HTML Handling**: HTML emails are automatically converted to plain text (HTML tags stripped)
-- **Attachments**: Shown as human-readable summaries with filenames and sizes (attachments not extracted)
-
-### Quality Improvements
-
-Compared to raw .eml file reading, the parser provides:
-- ✅ **No MIME boundaries** - All `------=_NextPart_000...` markers removed
-- ✅ **Decoded encodings** - Quoted-printable (`=20`, `=E2=80=9C`) automatically decoded
-- ✅ **Clean text** - MIME headers and Content-Type declarations removed from body
-- ✅ **~74% size reduction** - Typical reduction from raw .eml to clean text
-
-### Email Metadata Structure
-
-Email-specific metadata is available in `ExtractedDocument.metadata`:
-
-```python
-{
-    "extraction_method": "email_parser",
-    "email_headers": {
-        "subject": "RE: Contract Dispute",
-        "from": "legal@example.com",
-        "to": "counsel@firm.com",
-        "cc": "",
-        "date": "Wed, 07 Aug 2024 18:47:49 +0530",
-        "message_id": "<abc123@example.com>"
-    },
-    "body_format": "plain",  # or "html" or "multipart"
-    "has_attachments": true,
-    "attachment_count": 2
-}
-```
-
-### Limitations
-
-- **Attachments**: Not extracted or processed (shown as summaries only)
-- **HTML Formatting**: HTML emails lose formatting when converted to plain text
-- **Dependencies**: Uses Python stdlib only (`email.parser`, `HTMLParser`) - no new packages required
-- **Fallback**: If parsing fails, gracefully falls back to raw text reading with warning logged
-
-### Test Files
-
-Sample .eml files are available in `sample_pdf/famas_dispute/`:
-- 4 real legal correspondence emails from international arbitration case
-- Use for testing email extraction pipeline end-to-end
-
-### Implementation
-
-- **Parser Module**: `src/core/email_parser.py` (stdlib-only implementation)
-- **Integration**: `src/core/document_processor.py` routes .eml files through parser
-- **Metadata Wiring**: `src/core/docling_adapter.py` propagates email metadata to `ExtractedDocument`
-- **Test Scripts**: `scripts/test_email_parser.py`, `scripts/test_eml_integration.py`
-
-## 📷 Image File Support (JPEG/PNG)
-
-The pipeline supports **native image processing with OCR** for screenshots and scanned documents. Images are processed directly through Docling's OCR pipeline without conversion to PDF.
-
-### Supported Formats
-
-- **JPEG** (`.jpg`, `.jpeg`) - Legal document screenshots, photos of contracts
-- **PNG** (`.png`) - Screenshots, digital captures with transparency
-
-### How It Works
-
-1. **Upload Image**: JPEG or PNG file via Streamlit interface
-2. **OCR Processing**: Docling extracts text using Tesseract OCR (or configured OCR engine)
-3. **Event Extraction**: Same AI pipeline as PDFs (OpenRouter, Anthropic, etc.)
-4. **Table Output**: Standard five-column legal events table
-
-### Quality Considerations
-
-**Image Quality Matters:**
-- ✅ **High-quality screenshots**: 95%+ OCR accuracy (comparable to native PDFs)
-- ⚠️ **Phone photos**: 80-90% accuracy (lighting, angle affect OCR)
-- ❌ **Blurry/low-resolution**: <70% accuracy (may miss events)
-
-**Best Practices:**
-- Use screenshots over phone photos when possible
-- Ensure text is crisp and high-contrast
-- Minimum 1200x800 resolution recommended
-- Avoid handwritten text (OCR optimized for typed text)
-
-### Performance
-
-| Image Size | OCR Time | Total Time (w/ extraction) |
-|------------|----------|----------------------------|
-| Small (<1MB) | 5-10s | 10-20s |
-| Medium (1-3MB) | 10-20s | 20-40s |
-| Large (>3MB) | 20-40s | 40-80s |
-
-**Note:** Image OCR is slower than native PDF text extraction but comparable to scanned PDF processing.
-
-### OCR Configuration
-
-**Tesseract OCR Setup (Recommended):**
-
-Tesseract is the default OCR engine. **You must configure TESSDATA_PREFIX** for image processing to work:
-
+### 2. Full Analysis (2 minutes)
 ```bash
-# macOS (Homebrew)
-export TESSDATA_PREFIX=/usr/local/opt/tesseract/share/tessdata
-
-# Linux (apt)
-export TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
-
-# Windows
-set TESSDATA_PREFIX=C:\Program Files\Tesseract-OCR\tessdata
-
-# Add to your shell profile (~/.zshrc or ~/.bashrc) to persist
-echo 'export TESSDATA_PREFIX=/usr/local/opt/tesseract/share/tessdata' >> ~/.zshrc
+node toon-cost-analysis.js
 ```
+Comprehensive analysis across 5 different data types with detailed cost breakdowns.
 
-**Verify Configuration:**
+### 3. Interactive Testing
 ```bash
-tesseract --version
-echo $TESSDATA_PREFIX  # Should show the path
+node toon-cost-analysis.js --interactive
 ```
+Enter your own JSON data to see personalized cost savings.
 
-**Alternative OCR Engines:**
+## 💰 Real Cost Impact
 
-If Tesseract is not available, configure an alternative engine in `.env`:
+### Per Query Savings (GPT-4 pricing):
+- **Small dataset (3 employees)**: $0.0019 savings
+- **Medium dataset (100 employees)**: $0.1138 savings  
+- **Large dataset (60 analytics records)**: $0.0788 savings
 
-```bash
-# Use EasyOCR (no TESSDATA_PREFIX required, but slower)
-DOCLING_OCR_ENGINE=easyocr
+### At Scale (1,000 queries):
+- **Total cost savings**: $300.72 with GPT-4
+- **Total cost savings**: $150.36 with Claude-3
+- **Total cost savings**: $15.04 with GPT-3.5-turbo
 
-# Use OCRmac (macOS Vision Framework, fast)
-DOCLING_OCR_ENGINE=ocrmac
+### At Scale (10,000 queries):
+- **Total cost savings**: $3,007.20 with GPT-4
+- **Total cost savings**: $1,503.60 with Claude-3  
+- **Total cost savings**: $150.36 with GPT-3.5-turbo
 
-# Use RapidOCR (lightweight)
-DOCLING_OCR_ENGINE=rapidocr
-```
+## 📈 Format Comparison
 
-### Metadata
-
-Image-specific metadata in `ExtractedDocument.metadata`:
-
-```python
-{
-    "file_type": "jpg",
-    "extraction_method": "docling_image_ocr",
-    "needs_ocr": True,
-    "ocr_auto_detected": False,
-    "config": {
-        "do_ocr": True,  # Always enabled for images
-        "ocr_engine": "tesseract"  # Or configured engine
-    }
-}
-```
-
-### Limitations
-
-- **No page numbers**: Images are single-page (no PDF-style pagination)
-- **OCR-dependent**: Text must be typed (handwriting not supported)
-- **Format-specific**: TIFF, BMP, WebP, HEIC not yet supported (use JPEG/PNG)
-- **No vector graphics**: SVG, EPS need rasterization first
-- **Tesseract configuration required**: `TESSDATA_PREFIX` must be set for default OCR
-
-### Example Use Cases
-
-✅ **Legal screenshot uploads** - Court filing screenshots, email screenshots
-✅ **Contract photos** - Signed contract photos from mobile device
-✅ **Scanned single pages** - Individual page scans in JPEG format
-❌ **Handwritten notes** - OCR optimized for typed text only
-❌ **Multi-page documents** - Use PDF for multi-page files
-
-### Implementation
-
-- **Format Configuration**: `src/core/document_processor.py` configures `InputFormat.IMAGE`
-- **OCR Pipeline**: Reuses PDF OCR pipeline (Tesseract/EasyOCR/OCRmac)
-- **Image Routing**: `extract_text()` method routes JPEG/PNG through Docling
-- **Test Script**: `scripts/test_image_extraction.py`
-- **Dependencies**: Zero new dependencies (uses Docling's built-in image backend)
-
-## 📁 Project Structure
-
-```
-docling_langextract_testing/
-├── app.py               # Main Streamlit test application
-├── src/main.py          # Command-line version (alternative)
-├── .env.example         # Template for environment variables
-├── pyproject.toml       # Project configuration
-└── README.md            # This documentation
-```
-
-## 🏗️ Repository Structure
-
-**Core Directories:**
-- **`src/`** - Core pipeline logic, interfaces, and modular components
-  - `core/` - Pipeline orchestration, interfaces, and configuration
-  - `extractors/` - Individual extractor implementations
-  - `ui/` - Shared Streamlit UI components
-  - `utils/` - File handling utilities
-  - `visualization/` - Data visualization components
-- **`tests/`** - Comprehensive test suites and validation procedures
-- **`examples/`** - Demo Streamlit applications (5 apps for different testing scenarios)
-- **`docs/`** - Design documents, architecture decisions, and project orders
-  - `adr/` - Architecture Decision Records
-  - `orders/` - Active housekeeping orders for contributors
-  - `reports/` - Completion reports and documentation
-- **`scripts/`** - Development utilities and troubleshooting guides
-- **`output/`** - Generated results and extracted data files
-
-**Key Design Documents:**
-- [📋 Pluggable Extractors PRD](docs/pluggable_extractors_prd.md) - Product requirements and specifications
-- [🏛️ ADR-001: Pluggable Extractors](docs/adr/ADR-001-pluggable-extractors.md) - Architecture decision record
-
-## 🔬 Test Results
-
-The app provides:
-- ✅ **Success/Failure** indicators for each library
-- 📊 **Visual charts** showing performance by document type
-- 📋 **Data export** of extracted dates
-- 📈 **Success rate metrics**
-
-## ⚠️ Important Notes
-
-- This is a **TEST SCRIPT** - guaranteed five-column table output with fallback rows on failures
-- **Multiple event extractors supported**: LangExtract (Gemini), OpenRouter, OpenCode Zen (select via UI)
-- **Pure testing environment** to evaluate parser+extractor combinations
-- Results help determine which combination suits paralegal applications
-
-## ⏱️ Performance Metrics
-
-The system includes **built-in performance timing** to measure document processing speed and identify bottlenecks in the extraction pipeline.
-
-### How It Works
-
-Performance timing captures execution duration for two critical phases:
-1. **Docling Extraction** - PDF parsing, OCR, and text extraction time
-2. **Event Extraction** - LLM API call and legal event extraction time
-
-Timing is captured **per-document** (all events from the same document share identical timing values).
-
-### Enabling/Disabling Timing
-
-Control timing instrumentation via the `ENABLE_PERFORMANCE_TIMING` environment variable:
-
-```bash
-# Enable timing (default for development/testing)
-ENABLE_PERFORMANCE_TIMING=true
-
-# Disable timing (recommended for production to reduce overhead)
-ENABLE_PERFORMANCE_TIMING=false
-```
-
-**Default**: `true` (timing enabled)
-
-### Where Timing Data Appears
-
-#### 1. **Console Logs**
-When timing is enabled, the pipeline logs performance metrics for each document:
-
-```
-⏱️  Answer to Request for Arbitration.pdf: Docling=2.341s, Extractor=3.567s, Total=5.908s
-```
-
-#### 2. **Streamlit UI**
-The web interface displays **Performance Metrics** with average timing across all processed documents:
-
-- **Avg Docling Time** - Average PDF parsing duration
-- **Avg Extractor Time** - Average LLM extraction duration
-- **Avg Total Time** - End-to-end processing time
-
-#### 3. **Export Files (CSV/JSON/XLSX)**
-All exports include three additional timing columns when timing is enabled:
-
-| Column Name | Description | Example Value |
-|------------|-------------|---------------|
-| `Docling_Seconds` | Docling parsing time | 2.341 |
-| `Extractor_Seconds` | LLM extraction time | 3.567 |
-| `Total_Seconds` | Combined processing time | 5.908 |
-
-**Example CSV Export**:
-```csv
-No,Date,Event Particulars,Citation,Document Reference,Docling_Seconds,Extractor_Seconds,Total_Seconds
-1,2024-09-21,Lease agreement entered,RTA 2010,lease.pdf,1.234,2.567,3.801
-2,2024-10-01,Security deposit paid,RTA 2010,lease.pdf,1.234,2.567,3.801
-```
-
-### Expected Performance
-
-Timing varies based on document size, complexity, OCR requirements, and API latency:
-
-| Document Size | Docling Time | Extractor Time | Total Time |
-|--------------|--------------|----------------|------------|
-| Small PDF (~15 pages) | 1-3s | 2-5s | 3-8s |
-| Medium PDF (~50 pages) | 3-10s | 3-8s | 6-18s |
-| Large PDF (100+ pages) | 10-30s | 5-15s | 15-45s |
-
-**Factors Affecting Performance**:
-- **OCR Requirement**: Documents needing OCR take significantly longer
-- **Table Complexity**: `DOCLING_TABLE_MODE=ACCURATE` increases processing time
-- **Provider Latency**: LLM API response times vary by provider and model
-- **Document Format**: PDF requires more processing than TXT/HTML
-
-### Interpreting Timing Data
-
-Use timing metrics to:
-- **Identify Bottlenecks**: If `Docling_Seconds` dominates, consider faster parsing settings
-- **Optimize Provider Selection**: Compare extractor performance across providers
-- **Capacity Planning**: Estimate processing time for large document batches
-- **Cost Analysis**: Longer extraction times often correlate with higher API costs
-
-### Timing Precision
-
-- Uses `time.perf_counter()` for high-resolution timing (millisecond precision)
-- Displays 3 decimal places (e.g., `2.341s`)
-- Timing is document-level, not per-event (all events from same doc share timing)
-
-### When Timing is Disabled
-
-When `ENABLE_PERFORMANCE_TIMING=false`:
-- No timing capture or logging
-- Exports contain only the core 5 columns (no timing columns)
-- Streamlit UI shows no performance metrics section
-- Eliminates timing overhead for production use
-
-## 📊 DuckDB Analytics
-
-The system includes **DuckDB metadata ingestion** for queryable analytics across pipeline runs. Every extraction automatically exports a metadata JSON file that can be loaded into a local DuckDB database for SQL-based analysis.
-
-### Quick Start
-
-```bash
-# 1. Ingest metadata files into DuckDB
-uv run python scripts/ingest_metadata_to_duckdb.py --db runs.duckdb --glob "output/**/*_metadata.json"
-
-# 2. Run example queries
-uv run python scripts/query_duckdb.py --db runs.duckdb
-
-# 3. Or use SQL directly
-uv run python -c "
-import duckdb
-conn = duckdb.connect('runs.duckdb')
-print(conn.execute('SELECT * FROM pipeline_runs LIMIT 5').df())
-"
-```
-
-### What Gets Tracked
-
-Each pipeline run automatically exports metadata including:
-- **Configuration**: Parser, provider, model, OCR engine, table mode
-- **Performance**: Docling time, extraction time, total processing time
-- **Quality**: Events extracted, citations found, average detail length
-- **Cost**: Token usage and cost estimates (when available)
-- **Environment**: Hostname, session labels for experiment tracking
-
-**Metadata Location**: `output/{parser}-{provider}/{filename}_{timestamp}_metadata.json`
-
-### Common Queries
-
-**Average extraction time by model:**
-```sql
-SELECT provider_model,
-       AVG(extractor_seconds) as avg_time,
-       COUNT(*) as runs
-FROM pipeline_runs
-WHERE status = 'success'
-GROUP BY provider_model
-ORDER BY avg_time ASC;
-```
-
-**Cost tracking by provider:**
-```sql
-SELECT provider_name,
-       SUM(cost_usd) as total_cost,
-       COUNT(*) as runs
-FROM pipeline_runs
-WHERE cost_usd IS NOT NULL
-GROUP BY provider_name;
-```
-
-**Recent runs (last 7 days):**
-```sql
-SELECT run_id, timestamp, provider_model, events_extracted
-FROM pipeline_runs
-WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL '7 days'
-ORDER BY timestamp DESC;
-```
-
-### Available Tools
-
-- **Ingestion Script**: `scripts/ingest_metadata_to_duckdb.py` - Batch load metadata files
-- **Query Examples**: `scripts/query_duckdb.py` - Python examples for common analytics
-- **SQL Templates**: `docs/reports/duckdb-queries.sql` - 20+ copy-paste queries
-- **Schema Documentation**: `docs/reports/duckdb-ingestion-plan.md` - Complete schema design
-
-### Features
-
-- ✅ **Idempotent ingestion** - Safe to re-run (upsert logic)
-- ✅ **File-based database** - No server needed, portable
-- ✅ **JSON column support** - Full config snapshot queryable
-- ✅ **Dry-run mode** - Validate before ingesting
-- ✅ **CLI with progress** - Batch processing with stats
-
-### Example Workflow
-
-```bash
-# Process documents with different providers
-uv run streamlit run app.py  # Extract with OpenRouter
-# (Switch to Anthropic provider)
-# (Switch to OpenAI provider)
-
-# Analyze results
-uv run python scripts/ingest_metadata_to_duckdb.py --db runs.duckdb --glob "output/**/*_metadata.json"
-uv run python scripts/query_duckdb.py --db runs.duckdb --query avg-time
-uv run python scripts/query_duckdb.py --db runs.duckdb --query success-rate
-```
-
-**Use Cases:**
-- 🔍 Compare extraction quality across providers and models
-- 💰 Track API costs and optimize spending
-- ⚡ Identify performance bottlenecks
-- 📈 Monitor success rates and failure patterns
-- 🧪 Analyze A/B test results
-
-See `docs/reports/duckdb-queries.sql` for 20+ query examples.
-
-## 🚀 FastAPI Analytics API
-
-The system includes a **REST API** for querying pipeline metadata programmatically. The API provides read-only HTTP endpoints backed by DuckDB, enabling dashboard integrations, automated reporting, and programmatic analytics.
-
-### Quick Start
-
-```bash
-# 1. Set database path (required)
-export RUNS_DB_PATH=runs.duckdb
-
-# 2. Start API server
-uv run uvicorn src.api.main:app --reload --port 8000
-
-# 3. Access OpenAPI documentation
-open http://localhost:8000/docs
-```
-
-### Available Endpoints
-
-#### Health & Status
-- `GET /healthz` - Service health check (always 200 if running)
-- `GET /readyz` - Database readiness check (503 if DB unavailable)
-- `GET /version` - API version and configuration info
-
-#### Pipeline Runs
-- `GET /api/v1/runs` - List runs with filtering, sorting, and pagination
-  - **Filters**: `provider`, `model`, `status`, `date_from`, `date_to`, `filename_contains`
-  - **Sorting**: `timestamp`, `provider_name`, `provider_model`, `total_seconds`, `extractor_seconds`
-  - **Pagination**: Cursor-based (efficient for large datasets)
-- `GET /api/v1/runs/{run_id}` - Get single run details with sanitized config
-
-#### Statistics
-- `GET /api/v1/stats/by-model` - Aggregate performance by model
-- `GET /api/v1/stats/by-provider` - Aggregate performance by provider
-
-### Example Requests
-
-```bash
-# Health checks
-curl http://localhost:8000/healthz
-curl http://localhost:8000/readyz
-
-# List runs (basic)
-curl http://localhost:8000/api/v1/runs?limit=10
-
-# List runs (with filters)
-curl 'http://localhost:8000/api/v1/runs?provider=openai&status=success&sort=total_seconds:asc'
-
-# Date range filter
-curl 'http://localhost:8000/api/v1/runs?date_from=2025-10-01T00:00:00Z&date_to=2025-10-18T23:59:59Z'
-
-# Get single run
-curl http://localhost:8000/api/v1/runs/DL2-OA2-TS1-F-20251018120000
-
-# Stats by model
-curl http://localhost:8000/api/v1/stats/by-model
-
-# Stats by provider (with date filter)
-curl 'http://localhost:8000/api/v1/stats/by-provider?date_from=2025-10-17T00:00:00Z&status=success'
-```
-
-### Response Format
-
-All successful responses use a consistent envelope structure:
-
-**List Response:**
+**JSON (108 tokens, $0.0032):**
 ```json
 {
-  "data": [
-    {
-      "run_id": "DL2-OA2-TS1-F-20251018120000",
-      "timestamp": "2025-10-18T12:00:00",
-      "provider_name": "openai",
-      "provider_model": "gpt-4o-mini",
-      "status": "success",
-      "total_seconds": 6.1,
-      "events_extracted": 10
-    }
-  ],
-  "meta": {
-    "returned": 10,
-    "total": 96,
-    "next_cursor": "MjAyNS0xMC0xOFQxMjowMDowMHxETDItT0EyLVRTMS1GLTIwMjUxMDE4MTIwMDAw"
-  },
-  "links": {
-    "self": "http://localhost:8000/api/v1/runs?limit=10",
-    "next": "http://localhost:8000/api/v1/runs?limit=10&cursor=..."
-  }
+  "employees": [
+    {"id": 1, "name": "Alice", "role": "Engineer", "salary": 120000},
+    {"id": 2, "name": "Bob", "role": "Designer", "salary": 95000},
+    {"id": 3, "name": "Charlie", "role": "Manager", "salary": 140000}
+  ]
 }
 ```
 
-**Error Response:**
-```json
+**TOON (44 tokens, $0.0013):**
+```
+employees[3]{id,name,role,salary}:
+  1,Alice,Engineer,120000
+  2,Bob,Designer,95000
+  3,Charlie,Manager,140000
+```
+
+**Result: 59.3% token reduction, $0.0019 savings per query**
+
+## 🎯 When to Use TOON
+
+### ✅ Best for TOON:
+- **Employee/user records** - Perfect tabular data
+- **Analytics/metrics data** - Time-series with consistent fields
+- **Product catalogs** - Uniform product information
+- **Transaction logs** - Repeated transaction structures
+- **Any uniform array of objects** with the same fields
+
+### ⚠️ Consider JSON for:
+- **Highly nested data** - Deep object hierarchies
+- **Variable schemas** - Objects with very different fields
+- **Small datasets** - Under 10 items (overhead not worth it)
+- **Complex relationships** - Deeply interconnected data
+
+## 🔧 Integration Guide
+
+### Step 1: Convert JSON to TOON before LLM calls
+```javascript
+const { encode } = require('@toon-format/toon');
+
+// Your existing code
+const userData = getUserData(); // Returns JSON object
+
+// Convert to TOON for LLM efficiency
+const toonData = encode(userData);
+
+// Send to LLM
+const response = await llm.generate({
+  prompt: `Analyze this user data: ${toonData}`
+});
+```
+
+### Step 2: Decode TOON responses back to JSON
+```javascript
+const { decode } = require('@toon-format/toon');
+
+const toonResponse = await llm.generate(prompt);
+const jsonData = decode(toonResponse);
+```
+
+### Step 3: Calculate your actual savings
+```javascript
+const { encode: encodeTokens } = require('gpt-tokenizer');
+
+const jsonSize = encodeTokens(JSON.stringify(data)).length;
+const toonSize = encodeTokens(encode(data)).length;
+const savings = ((jsonSize - toonSize) / jsonSize * 100).toFixed(1);
+
+console.log(`TOON saves ${savings}% tokens for your data`);
+```
+
+## 📋 Data Requirements for TOON
+
+TOON works best when your data meets these criteria:
+
+1. **Uniform Objects**: All objects in an array have the same fields
+2. **Primitive Values**: Fields contain strings, numbers, booleans, or null
+3. **Consistent Structure**: No missing fields or varying field types
+4. **Tabular Nature**: Data looks like a table/spreadsheet
+
+Example of ideal TOON data:
+```javascript
 {
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Run with id 'XYZ' not found"
-  }
+  employees: [
+    { id: 1, name: "Alice", department: "Engineering", salary: 120000 },
+    { id: 2, name: "Bob", department: "Design", salary: 95000 },
+    { id: 3, name: "Charlie", department: "Marketing", salary: 100000 }
+  ]
 }
 ```
 
-### Environment Variables
+## 🧮 How the Analysis Works
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `RUNS_DB_PATH` | ✅ Yes | _(none)_ | Path to DuckDB file (e.g., `runs.duckdb`) |
-| `API_PORT` | No | `8000` | Server port |
-| `API_HOST` | No | `0.0.0.0` | Server host (0.0.0.0 for all interfaces) |
-| `CORS_ALLOW_ORIGINS` | No | _(empty)_ | Comma-separated allowed CORS origins |
+1. **Sample Data Generation**: Creates realistic datasets for different use cases
+2. **Format Conversion**: Converts each dataset to both JSON and TOON
+3. **Token Counting**: Uses GPT tokenizer to count actual tokens
+4. **Cost Calculation**: Applies current LLM pricing rates
+5. **Comparison Report**: Generates detailed before/after analysis
 
-### Features
+## 📦 Dependencies
 
-- ✅ **Read-only access** - No write endpoints (safe for dashboards)
-- ✅ **Cursor pagination** - Efficient for large datasets (no OFFSET overhead)
-- ✅ **Structured errors** - Consistent error responses with codes
-- ✅ **OpenAPI documentation** - Auto-generated interactive docs at `/docs`
-- ✅ **Config sanitization** - Sensitive keys removed from API responses
-- ✅ **CORS support** - Optional CORS for browser-based dashboards
-- ✅ **SQL injection protection** - Parameterized queries + sort field whitelist
+- `@toon-format/toon` - TOON encoding/decoding
+- `gpt-tokenizer` - Accurate token counting
 
-### Testing
+## 🔍 Understanding the Results
 
-Run the comprehensive test suite:
+### Token Efficiency
+- **60%+ savings**: Employee records, analytics data (perfect tabular)
+- **30-40% savings**: E-commerce orders (nested but mostly uniform)  
+- **20-30% savings**: Mixed data (some uniform, some variable)
+- **<20% savings**: Complex nested data (TOON may not be optimal)
 
-```bash
-# Install test dependencies (included in uv sync)
-uv sync
+### Cost Impact
+- **High-cost LLMs** (GPT-4, Claude-3): Significant savings
+- **Medium-cost LLMs** (GPT-3.5): Moderate savings
+- **Low-cost LLMs** (Haiku): Small but measurable savings
 
-# Run all API tests
-uv run python -m pytest tests/test_api_fastapi.py -v
+### Scale Factor
+- **Cost savings compound** with the number of queries
+- **ROI increases** with dataset size and LLM cost
+- **Break-even** is essentially instant for any meaningful usage
 
-# Run specific test
-uv run python -m pytest tests/test_api_fastapi.py::test_list_runs_basic -v
-```
+## 💡 Pro Tips
 
-**Test Coverage:**
-- Health endpoints (healthz, readyz, version)
-- List runs (basic, filters, sorting, pagination, invalid params)
-- Get run by ID (found, not found, config sanitization)
-- Stats endpoints (by-model, by-provider, with filters)
-- OpenAPI documentation availability
-- Error handling (400, 404, 500)
+1. **Test Your Data**: Run the interactive mode with your actual datasets
+2. **Batch Processing**: Apply TOON to your largest, most frequent queries first
+3. **Monitor Savings**: Track token usage before/after TOON implementation
+4. **Use Tab Delimiters**: For very large datasets, try `--delimiter "\t"` option
+5. **Keep JSON for Storage**: Use TOON only for LLM input, JSON for databases
 
-### OpenAPI Documentation
+## 🏆 Bottom Line
 
-Interactive API documentation is available at:
-- **Swagger UI**: `http://localhost:8000/docs`
-- **ReDoc**: `http://localhost:8000/redoc`
-- **OpenAPI Spec**: `http://localhost:8000/openapi.json`
+TOON delivers on its promises:
+- **Measured 50.1% token reduction** across diverse datasets
+- **Real cost savings** starting from the very first query
+- **Scales dramatically** with usage volume
+- **Simple integration** into existing workflows
 
-### Production Deployment
+**If you send structured data to LLMs and pay for tokens, TOON will save you money.**
 
-For production use, configure a production-grade ASGI server:
+## 📖 Learn More
 
-```bash
-# With Gunicorn + Uvicorn workers (Linux/macOS)
-pip install gunicorn
-gunicorn src.api.main:app \
-  --workers 4 \
-  --worker-class uvicorn.workers.UvicornWorker \
-  --bind 0.0.0.0:8000
-
-# Or use systemd service (see deployment docs)
-```
-
-### Security Notes
-
-- **No authentication** - Implement reverse proxy auth if exposing publicly
-- **Read-only database** - API uses `read_only=True` DuckDB connections
-- **Config sanitization** - API keys, tokens, and secrets removed from responses
-- **CORS allowlist** - Only specified origins allowed (default: none)
-
-### Use Cases
-
-🔍 **Dashboard Integration** - Connect Grafana, Metabase, or custom dashboards
-📊 **Automated Reporting** - Generate daily/weekly performance reports via API
-🔄 **CI/CD Integration** - Query extraction metrics as part of build pipelines
-📈 **Real-time Monitoring** - Poll `/api/v1/stats` for live performance metrics
-🧪 **A/B Test Analysis** - Compare provider performance programmatically
-
-See `tests/test_api_fastapi.py` for example API usage patterns.
-
-## 🤖 Assistant Guardrails
-
-When using Claude (or any other AI helper) with this repository, keep it focused on the documented proof-of-concept scope:
-
-- **Stay on mission:** Only propose or modify code that contributes directly to "documents in → legal events table out" testing. Skip unrelated refactors, new features, or production hardening.
-- **No fake extractor usage:** Do not mark event extractors (LangExtract, OpenRouter, OpenCode Zen) as successful unless the real API is called. If API access is missing, halt and report the gap—do **not** introduce regex or other fallbacks.
-- **Respect toggles and config:** Any automation must treat the Streamlit UI selections (provider choice, model selection) as the source of truth—no hard-coded overrides.
-- **Guard sample data:** Avoid inventing or writing back large synthetic documents; use small snippets that illustrate test cases.
-- **Document assumptions:** When APIs are mocked, call that out explicitly so downstream testing knows the difference.
-
-## 🔌 This Is How LangExtract Can Be Pinged
-
-The snippet below demonstrates a minimal end-to-end call against the real LangExtract extractor using the `GEMINI_API_KEY` defined in your `.env` file. It loads a short legal paragraph, supplies a concrete few-shot example, and prints the structured results returned by Gemini.
-
-```python
-import os
-from dotenv import load_dotenv
-import langextract as lx
-
-load_dotenv()  # ensures GEMINI_API_KEY is available via environment
-
-legal_text = """
-This Lease Agreement is entered into on September 21, 2025. The lease begins on
-October 1, 2025 and rent is due on the 5th of every month.
-""".strip()
-
-examples = [
-    lx.data.ExampleData(
-        text="This contract was signed on March 15, 2024 and becomes effective on April 1, 2024.",
-        extractions=[
-            lx.data.Extraction(
-                extraction_class="contract_date",
-                extraction_text="March 15, 2024",
-                attributes={"normalized_date": "2024-03-15", "type": "signing_date"},
-            ),
-            lx.data.Extraction(
-                extraction_class="effective_date",
-                extraction_text="April 1, 2024",
-                attributes={"normalized_date": "2024-04-01", "type": "effective_date"},
-            ),
-        ],
-    )
-]
-
-response = lx.extract(
-    text_or_documents=legal_text,
-    prompt_description="Extract every legally meaningful date and provide a normalized ISO date.",
-    examples=examples,
-    model_id="gemini-2.0-flash",
-    api_key=os.environ["GEMINI_API_KEY"],
-)
-
-for item in response.extractions:
-    attrs = item.attributes or {}
-    print(item.extraction_class, "→", item.extraction_text, attrs.get("normalized_date"))
-```
-
-⚠️ Run this only when you have valid Gemini access—each invocation makes a real LLM call and may incur usage costs.
-
-## 🚀 Gemini 2.0 Flash Model
-
-This project now uses **Gemini 2.0 Flash** (`gemini-2.0-flash`) for enhanced legal event extraction capabilities. The newer model provides improved accuracy and better handling of complex legal document structures.
-
-### Model Configuration
-
-- **Default Model**: `gemini-2.0-flash` (configured in `src/core/constants.py`)
-- **Environment Override**: Set `GEMINI_MODEL_ID` environment variable to use a different model
-- **API Access**: Ensure your Google Cloud project has access to Gemini 2.0 Flash models
-
-### Model Override Example
-
-```bash
-# Use a different model for testing
-export GEMINI_MODEL_ID="gemini-2.0-flash"
-uv run streamlit run app.py
-
-# Use experimental model
-export GEMINI_MODEL_ID="gemini-2.0-flash-exp"
-uv run streamlit run app.py
-```
-
-**Note**: Different environments may require different model access. Use the environment variable override if your deployment environment has different model availability.
-
-### ✅ Verified Active Configuration
-
-**Current Status** (as of latest verification):
-- ✅ Default model: `gemini-2.0-flash`
-- ✅ Environment override: Not set (using default)
-- ✅ API endpoints: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash`
-- ✅ Extraction performance: 13 events extracted with 499-character descriptions
-
-**Environment Variable Precedence:**
-- If `GEMINI_MODEL_ID` is set → Uses that model (overrides default)
-- If `GEMINI_MODEL_ID` is unset → Uses `DEFAULT_MODEL = "gemini-2.0-flash"`
-
-**Troubleshooting Model Issues:**
-```bash
-# Check current environment
-env | grep GEMINI_MODEL_ID
-
-# Clear override to use default 2.0 Flash
-unset GEMINI_MODEL_ID
-
-# Verify model in logs
-uv run python3 -c "from src.core.langextract_client import LangExtractClient; print(f'Model: {LangExtractClient().model_id}')"
-```
-
-## 📋 LangExtract Prompt Contract
-
-This project enforces a **standardized prompt contract** for consistent legal events extraction. All LangExtract calls must return exactly four JSON keys to ensure reliable five-column table output.
-
-### Required JSON Schema
-
-Every extracted legal event must include these four keys:
-
-```json
-{
-  "event_particulars": "Complete description (2-8 sentences) with comprehensive context, parties, procedural background, and implications",
-  "citation": "Legal citation or reference (empty string if none exists)",
-  "document_reference": "Source document filename (automatically set)",
-  "date": "Specific date mentioned (empty string if not found)"
-}
-```
-
-### Key Policies
-
-- **Enhanced Context**: The `event_particulars` field requires 2-8 sentences as appropriate to provide comprehensive legal context for AI summarization
-- **No Hallucinated Citations**: The `citation` field must remain empty (`""`) when no verbatim legal reference exists in the text
-- **Anchored Document References**: The `document_reference` field is automatically populated with the source filename passed to the extraction method
-- **Empty Strings for Missing Data**: Use empty strings (`""`) instead of placeholder text for missing values
-- **Required Keys**: All four keys must be present in every extraction
-- **Character Offsets**: When available from LangExtract, character offsets are captured in the raw payload for precise source attribution
-
-### Implementation
-
-The standardized prompt is defined in `src/core/constants.py` as `LEGAL_EVENTS_PROMPT` and used consistently across all LangExtract operations. This ensures:
-
-- Consistent extraction format across the entire application
-- No invented legal citations that could mislead users
-- Reliable document reference tracking
-- Maintainable prompt updates from a single location
-- Enhanced context (2-8 sentences) for future GPT-5 integration and AI summarization
-- Character offset capture when available for precise source attribution
-
-### Example Output
-
-```json
-[
-  {
-    "event_particulars": "On January 15, 2024, the plaintiff filed a motion to dismiss the complaint pursuant to Rule 12(b)(6) of the Federal Rules of Civil Procedure. This motion challenges the legal sufficiency of the complaint, arguing that the plaintiff has failed to state a claim upon which relief can be granted. The filing of this motion suspends the defendant's obligation to file an answer until the court rules on the motion. If granted, the motion would result in dismissal of some or all claims without the need for further discovery or trial proceedings.",
-    "citation": "Fed. R. Civ. P. 12(b)(6)",
-    "document_reference": "legal_filing.pdf",
-    "date": "2024-01-15"
-  },
-  {
-    "event_particulars": "A settlement conference was scheduled for April 10, 2024, to facilitate negotiations between the parties before proceeding to trial. This judicial settlement conference will be overseen by a magistrate judge who will help the parties explore potential resolution of the dispute. The conference represents a crucial opportunity for both sides to assess the strengths and weaknesses of their positions and potentially reach a mutually agreeable resolution.",
-    "citation": "",
-    "document_reference": "legal_filing.pdf",
-    "date": "2024-04-10"
-  }
-]
-```
-
-**Enhanced Context Features:**
-- **Comprehensive Descriptions**: Each `event_particulars` contains 2-8 sentences with full legal context
-- **Empty Citations**: The second event has an empty `citation` field since no legal reference was mentioned
-- **Character Offsets**: When available, `char_start` and `char_end` attributes provide precise source location (hidden from table display)
-- **GPT-5 Ready**: Rich context enables advanced AI summarization and analysis
-
-## 🔧 Pluggable Pipeline Architecture
-
-This project features a **modular, configurable pipeline** that allows easy swapping of document processing and event extraction components.
-
-### Core Architecture
-
-The system uses **adapter interfaces** to decouple processing logic from specific implementations:
-
-- **DocumentExtractor**: Interface for text extraction (currently: Docling)
-  - Returns `ExtractedDocument` with `markdown`, `plain_text`, and `metadata` fields
-- **EventExtractor**: Interface for legal events extraction (currently: LangExtract)
-  - Returns `EventRecord` instances with `attributes` field containing LangExtract metadata
-- **ExtractorFactory**: Creates configured extractors based on environment settings
-
-### Configuration Options
-
-#### Docling Document Processing
-Control Docling behavior via environment variables:
-
-```bash
-# OCR and table processing
-DOCLING_DO_OCR=true                    # Enable/disable OCR (default: true)
-DOCLING_DO_TABLE_STRUCTURE=true        # Enable table structure detection (default: true)
-DOCLING_TABLE_MODE=FAST                # Table mode: FAST or ACCURATE (default: FAST)
-DOCLING_DO_CELL_MATCHING=true          # Enable table cell matching (default: true)
-
-# Backend and performance
-DOCLING_BACKEND=default                # Backend: default or v2 (default: default)
-DOCLING_ACCELERATOR_DEVICE=cpu         # Device: cpu, cuda, mps (default: cpu)
-DOCLING_ACCELERATOR_THREADS=4          # Thread count (default: 4)
-DOCLING_DOCUMENT_TIMEOUT=300           # Processing timeout in seconds (default: 300)
-
-# Optional paths
-DOCLING_ARTIFACTS_PATH=/path/to/cache  # Cache directory (optional)
-```
-
-#### LangExtract Event Processing
-Configure LangExtract behavior:
-
-```bash
-# Model settings
-GEMINI_MODEL_ID=gemini-2.0-flash       # Override default model (default: gemini-2.0-flash)
-LANGEXTRACT_TEMPERATURE=0.0            # Model temperature (default: 0.0)
-LANGEXTRACT_MAX_WORKERS=10             # Parallel workers (default: 10)
-LANGEXTRACT_DEBUG=false                # Debug mode (default: false)
-
-# Required API access
-GEMINI_API_KEY=your_google_api_key_here
-```
-
-#### Extractor Selection
-Choose different implementations:
-
-```bash
-# Component selection (for future extensibility)
-DOC_EXTRACTOR=docling                  # Document extractor type (default: docling)
-EVENT_EXTRACTOR=langextract             # Event extractor type (default: langextract)
-```
-
-These selections are now managed through the `ExtractorConfig` dataclass, providing type-safe configuration.
-
-### Example: High-Performance Configuration
-
-```bash
-# Optimized for accuracy and performance
-DOCLING_DO_OCR=true
-DOCLING_TABLE_MODE=ACCURATE
-DOCLING_BACKEND=v2
-DOCLING_ACCELERATOR_DEVICE=cuda
-DOCLING_ACCELERATOR_THREADS=8
-DOCLING_DOCUMENT_TIMEOUT=600
-
-GEMINI_MODEL_ID=gemini-2.0-flash
-LANGEXTRACT_TEMPERATURE=0.0
-LANGEXTRACT_MAX_WORKERS=20
-
-uv run streamlit run app.py
-```
-
-### Adding New Extractors
-
-The adapter pattern makes it easy to add new implementations:
-
-1. **Implement the interface** (`DocumentExtractor` or `EventExtractor`)
-2. **Register in factory** (`extractor_factory.py`)
-3. **Configure via environment** variables
-
-This design enables **A/B testing**, **gradual migrations**, and **vendor flexibility** without changing application logic.
-
-### Tesseract OCR Setup (Recommended)
-
-Tesseract is the default OCR engine and is **3x faster** than EasyOCR with **31% better text extraction**.
-
-**Installation:**
-
-```bash
-# macOS (Homebrew)
-brew install tesseract
-
-# Linux (Ubuntu/Debian)
-sudo apt install tesseract-ocr libtesseract-dev
-
-# Windows
-# Download from: https://github.com/UB-Mannheim/tesseract/wiki
-```
-
-**Configuration:**
-
-Set the `TESSDATA_PREFIX` environment variable to point to Tesseract's language data directory:
-
-```bash
-# macOS (Homebrew)
-export TESSDATA_PREFIX=/usr/local/opt/tesseract/share/tessdata
-
-# Linux (apt)
-export TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
-
-# Windows
-set TESSDATA_PREFIX=C:\Program Files\Tesseract-OCR\tessdata
-```
-
-**Verify Installation:**
-
-```bash
-tesseract --version
-echo $TESSDATA_PREFIX  # Should show the path
-```
-
-**Performance:** Tesseract processes scanned legal documents at **22s/page** vs EasyOCR's **70s/page** (3x faster).
-
-See benchmark: [`docs/benchmarks/2025-10-03-ocr-engine-war.md`](docs/benchmarks/2025-10-03-ocr-engine-war.md)
-
-### Environment Variables Quick Reference
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| **Extractor Selection** |  |  |
-| `DOC_EXTRACTOR` | `docling` | Document extractor type |
-| `EVENT_EXTRACTOR` | `langextract` | Event extractor type (langextract, openrouter, opencode_zen) |
-| **Docling Configuration** |  |  |
-| `DOCLING_DO_OCR` | `true` | Enable/disable OCR |
-| `DOCLING_DO_TABLE_STRUCTURE` | `true` | Enable table structure detection |
-| `DOCLING_TABLE_MODE` | `FAST` | Table mode: FAST or ACCURATE |
-| `DOCLING_DO_CELL_MATCHING` | `true` | Enable table cell matching |
-| `DOCLING_BACKEND` | `default` | Backend: default or v2 |
-| `DOCLING_ACCELERATOR_DEVICE` | `cpu` | Device: cpu, cuda, mps |
-| `DOCLING_ACCELERATOR_THREADS` | `4` | Thread count |
-| `DOCLING_DOCUMENT_TIMEOUT` | `300` | Processing timeout (seconds) |
-| `DOCLING_ARTIFACTS_PATH` | _(unset)_ | Cache directory (optional) |
-| **LangExtract Configuration** |  |  |
-| `GEMINI_API_KEY` | _(required)_ | Google API key for Gemini |
-| `GEMINI_MODEL_ID` | `gemini-2.0-flash` | Override default model |
-| `LANGEXTRACT_TEMPERATURE` | `0.0` | Model temperature |
-| `LANGEXTRACT_MAX_WORKERS` | `10` | Parallel workers |
-| `LANGEXTRACT_DEBUG` | `false` | Debug mode |
-| **OpenRouter Configuration** |  |  |
-| `OPENROUTER_API_KEY` | _(required for OpenRouter)_ | OpenRouter API key |
-| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base URL |
-| `OPENROUTER_MODEL` | `anthropic/claude-3-haiku` | OpenRouter model to use |
-| `OPENROUTER_TIMEOUT` | `30` | Request timeout in seconds |
-| **OpenCode Zen Configuration** |  |  |
-| `OPENCODEZEN_API_KEY` | _(required for OpenCode Zen)_ | OpenCode Zen API key |
-| `OPENCODEZEN_BASE_URL` | `https://api.opencode-zen.example/v1` | OpenCode Zen API base URL |
-| `OPENCODEZEN_MODEL` | `opencode-zen/legal-extractor` | OpenCode Zen model to use |
-| `OPENCODEZEN_TIMEOUT` | `30` | Request timeout in seconds |
-
-**Note**: New extractors can be added by implementing the interfaces in `src/core/interfaces.py` and registering them in `src/core/extractor_factory.py`.
-
-## 📊 Documentation Integrity (ADICR)
-
-Run **ADICR** (Automated Documentation Integrity and Coverage Report) to detect documentation drift when providers or configuration changes:
-
-```bash
-uv run python scripts/generate_adicr_report.py --refresh
-```
-
-**What ADICR Checks:**
-- Provider parity: All providers in code appear in documentation
-- Environment variable coverage: All config vars documented in README and .env.example
-- Doc extractor options: UI options match available extractors
-
-**Outputs:**
-- **Markdown Report**: `docs/reports/adicr-latest.md` (human-readable)
-- **JSON Report**: `output/adicr/adicr_report.json` (machine-readable for CI/CD)
-
-**When to Run:**
-- After adding/removing a provider
-- Before creating documentation PRs
-- After modifying `src/core/config.py` environment variables
-- When reviewing documentation accuracy
-
-**Exit Codes:**
-- `0` - All documentation in sync or warnings only
-- `1` - Critical issues found (documentation updates needed)
+- [TOON Specification](https://github.com/toon-format/spec)
+- [Official Website](https://toonformat.dev)
+- [Interactive Playground](https://www.curiouslychase.com/playground/format-tokenization-exploration)
 
 ---
 
-**Testing library combination for paralegal date extraction use case** ⚖️
+*This analysis was generated on 2025-11-09 using real token counting and current LLM pricing rates.*
