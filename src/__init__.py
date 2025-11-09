@@ -1,1 +1,0 @@
-# Paralegal Date Extraction Test - Docling + Langextract

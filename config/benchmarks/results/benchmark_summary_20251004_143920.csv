@@ -1,7 +1,0 @@
-Provider,Success,Events,Doc Time (s),Event Time (s),Total Time (s),Tokens,Cost ($),Model,Error
-langextract,True,5,6.93,5.62,12.55,0,0.0,unknown,
-openrouter,True,1,5.83,5.25,11.08,0,0.0,unknown,
-opencode_zen,True,1,6.34,2.02,8.37,0,0.0,unknown,
-openai,True,1,6.03,5.71,12.22,1641,0.005865,gpt-4o-mini,
-anthropic,True,3,6.38,3.61,10.37,0,0.0,unknown,
-deepseek,False,0,0.0,0.0,0.0,0,0.0,unknown,DeepSeek API key is required. Set DEEPSEEK_API_KEY environment variable.

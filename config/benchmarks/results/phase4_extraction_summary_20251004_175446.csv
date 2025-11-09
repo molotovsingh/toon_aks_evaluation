@@ -1,7 +1,0 @@
-Provider,Document,Success,Events,Doc Time (s),Event Time (s),Total Time (s),Tokens,Cost ($),Error
-langextract,Answer to Request for Arbitration.pdf,True,5,10.35,4.68,15.03,0,0.0,
-opencode_zen,Answer to Request for Arbitration.pdf,True,1,13.07,2.01,15.09,0,0.0,
-openrouter,Answer to Request for Arbitration.pdf,True,1,12.18,6.92,19.11,0,0.0,
-deepseek,Answer to Request for Arbitration.pdf,False,0,0.0,0.0,0.0,0,0.0,DeepSeek API key is required. Set DEEPSEEK_API_KEY environment variable.
-anthropic,Answer to Request for Arbitration.pdf,True,3,8.69,3.49,12.41,0,0.0,
-openai,Answer to Request for Arbitration.pdf,True,1,7.71,6.29,14.08,1618,0.005634999999999999,
